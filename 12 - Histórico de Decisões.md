@@ -16,7 +16,7 @@ Resultado: React + Vite + Tailwind + Zustand com `persist` em `localStorage`. Ve
 
 ## 2. Formato da mensagem de finalização
 
-O pedido original era "finalização com PERDCOMP (documento PDF)". Depois de conversa, ficou claro que não era um PDF de verdade — era uma **mensagem de texto** pronta pra colar no Bitrix, com formatos diferentes pra compensação e ressarcimento. Detalhado em [[08 - Finalização e Mensagem Bitrix]].
+O pedido original era "finalização com PERDCOMP (documento PDF)". Depois de conversa, ficou claro que não era um PDF de verdade — era uma **mensagem de texto** pronta pra colar no Bitrix, com formatos diferentes pra compensação e o tipo que na época se chamava "ressarcimento" (depois renomeado pra "retificação" — ver item 10). Detalhado em [[08 - Finalização e Mensagem Bitrix]].
 
 ## 3. Bug do `crypto.randomUUID` em contexto inseguro
 
@@ -52,4 +52,25 @@ A primeira versão de notificações só gravava eventos no banco — cada usuá
 
 ## 9. Esta documentação
 
-Pedido explícito: documentar tudo em Markdown interligado (estilo Obsidian), pra registrar o estado atual do sistema e as conexões entre os conceitos — o conjunto de notas que você está lendo agora.
+Pedido explícito: documentar tudo em Markdown interligado (estilo Obsidian), pra registrar o estado atual do sistema e as conexões entre os conceitos — o conjunto de notas que você está lendo agora, versionado num repositório GitHub próprio (`Clamilton/sistemas_reserva`) que serve como memória de alterações: cada rodada de mudanças no sistema gera uma atualização aqui + um commit novo.
+
+## 10. Colunas renomeadas, prioridade com ordem obrigatória, pausa com motivo pro gestor
+
+Pedido único com várias partes:
+- **Colunas renomeadas**: "Fila" → "Aguardando Início", "Revisão" → "Em Pausa".
+- **Cronômetro pausa de verdade** na coluna "Em Pausa" (decisão confirmada: o nome novo só fazia sentido se o tempo parasse de contar mesmo) — exigiu mudar o cálculo de tempo trabalhado de uma subtração simples (`finishedAt - startedAt`) pra uma soma dos períodos em colunas ativas (ver [[05 - Quadro Kanban e Cronômetro]]).
+- **Motivo obrigatório ao pausar**, com pop-up antes do movimento acontecer (diferente do fluxo de finalização, que move e permite reverter depois).
+- **Papel de gestor** criado (`User.isGestor`) especificamente pra receber essa notificação de motivo — decisão confirmada em vez de simplesmente destacar a notificação pra todo mundo, pra manter esse tipo de informação mais restrita.
+- **Prioridade (Baixa/Média/Alta)** na criação da demanda, com bloqueio em cascata: não dá pra iniciar uma tarefa se houver outra de prioridade maior pendente; dentro de Alta/Média, tem que seguir ordem de criação (mais antiga primeiro); Baixa não tem essa exigência entre si. Testado extensivamente com múltiplos cenários (duas Alta, uma Baixa bloqueada por Alta criada depois dela, liberação após iniciar a mais antiga). Detalhe completo em [[14 - Prioridade e Pausa com Gestor]].
+
+## 11. Ressarcimento renomeado pra Retificação
+
+Pedido de renomear "Ressarcimento" pra "Retificação" em todo o sistema — o termo antigo não representava corretamente o processo real da equipe. Envolveu: renomear o valor do enum no banco (`ALTER TYPE ... RENAME VALUE`, preservando as tarefas já existentes com esse tipo, em vez de recriar a coluna), atualizar rótulos/badges na interface, e mudar o texto da mensagem final (`ressarcida` → `retificada`) — confirmado explicitamente que a mensagem deveria acompanhar a renomeação, não só o rótulo visual.
+
+## 12. Tipo perguntado primeiro, sem pré-seleção
+
+A escolha de Compensação/Retificação virou a **primeira pergunta** da tela de nova demanda (antes até de colar o texto), sem nenhuma opção pré-marcada — o resto do formulário só aparece depois de escolher. Decisão confirmada: bloquear o formulário (não só reordenar visualmente), porque "perguntando antes" só faz sentido de verdade se a pessoa for obrigada a decidir primeiro.
+
+## 13. Campo de detalhes da retificação, sem o texto colado
+
+Como Retificação não depende de identificar automaticamente a empresa a partir de um texto de grupo (diferente de Compensação), dois ajustes: um campo de texto livre, sem limite de caracteres, perguntando "Como será feita a retificação?" (só aparece pra esse tipo); e o campo "Cole o texto recebido" (com toda a extração automática de empresa/guia/siglas) passou a **não aparecer** quando o tipo é Retificação, já que não é necessário informá-lo — Empresa, CNPJ, Guia e Siglas continuam disponíveis, só que preenchidos manualmente nesse caso.

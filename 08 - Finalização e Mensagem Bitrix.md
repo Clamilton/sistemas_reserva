@@ -20,14 +20,14 @@ Empresa "NOME DA EMPRESA" - Compensada, SIGLA1/SIGLA2
 ```
 As siglas vêm do campo "Siglas" da tarefa (ver [[06 - Criação de Demandas]]), juntadas com `/`.
 
-### Ressarcimento
+### Retificação
 ```
-Empresa "NOME DA EMPRESA" ressarcida, relatório no Bitrix.
+Empresa "NOME DA EMPRESA" retificada, relatório no Bitrix.
 ```
-Texto fixo — **não** lista siglas (diferente da compensação). Motivo: ressarcimento tem um relatório à parte já registrado no Bitrix, então a mensagem só sinaliza que o processo terminou.
+Texto fixo — **não** lista siglas (diferente da compensação). O tipo se chamava "Ressarcimento" originalmente; foi renomeado pra "Retificação" (nome/conceito mais correto pro processo real), e a palavra da mensagem acompanhou a mudança (`ressarcida` → `retificada`) — ver [[12 - Histórico de Decisões]].
 
 > [!note] Por que dois formatos diferentes
-> Isso foi definido diretamente pelo usuário durante o desenvolvimento, ajustando a partir do formato inicial "Empresa X - Compensada, [siglas]" que ele já usava. O texto de ressarcimento veio de um exemplo real que ele forneceu.
+> Isso foi definido diretamente pelo usuário durante o desenvolvimento, ajustando a partir do formato inicial "Empresa X - Compensada, [siglas]" que ele já usava. O texto de retificação veio de um exemplo real que ele forneceu.
 
 ## Fluxo do modal
 

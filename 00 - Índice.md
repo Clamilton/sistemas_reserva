@@ -4,7 +4,7 @@ tags: [sistema-demandas, moc, índice]
 
 # Controle de Demandas — Índice
 
-Hub central da documentação do **Controle de Demandas**: sistema web para gerenciar o fluxo de demandas fiscais (compensações e ressarcimentos) da equipe, desde o recebimento do pedido no grupo até a finalização com a mensagem pro Bitrix.
+Hub central da documentação do **Controle de Demandas**: sistema web para gerenciar o fluxo de demandas fiscais (compensações e retificações) da equipe, desde o recebimento do pedido no grupo até a finalização com a mensagem pro Bitrix.
 
 > [!info] Status atual
 > Sistema em produção na VPS, acessível em `http://187.77.49.158:5173`.
@@ -31,6 +31,7 @@ Hub central da documentação do **Controle de Demandas**: sistema web para gere
 - [[07 - Cadastro de Empresas]]
 - [[08 - Finalização e Mensagem Bitrix]]
 - [[09 - Notificações em Tempo Real]]
+- [[14 - Prioridade e Pausa com Gestor]]
 
 ## Acesso rápido
 

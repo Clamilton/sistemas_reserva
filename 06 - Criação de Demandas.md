@@ -4,18 +4,17 @@ tags: [sistema-demandas, criação-de-demanda, técnico]
 
 # Criação de Demandas
 
-← [[00 - Índice]] · Ver também [[07 - Cadastro de Empresas]] · [[12 - Histórico de Decisões]]
+← [[00 - Índice]] · Ver também [[07 - Cadastro de Empresas]] · [[12 - Histórico de Decisões]] · [[14 - Prioridade e Pausa com Gestor]]
 
-## O fluxo (zero clique até os dados aparecerem)
+## O fluxo
 
-1. Usuário clica em **Nova demanda** e cola o texto recebido no grupo.
-2. Depois de ~350ms sem digitar (debounce), o sistema automaticamente:
+1. Usuário clica em **Nova demanda** — a **primeira pergunta**, antes de qualquer outro campo, é o tipo: **Compensação** ou **Retificação**. Nada vem pré-selecionado; o resto do formulário só aparece depois de escolher.
+2. **Se Compensação:** aparece o campo pra colar o texto recebido no grupo. Depois de ~350ms sem digitar (debounce), o sistema automaticamente:
    - tenta achar a **empresa** comparando o texto contra o [[07 - Cadastro de Empresas|cadastro de empresas]];
    - tenta achar o **Código da Receita** (guia) e resolve a(s) **sigla(s)** do imposto.
-3. Os campos ficam preenchidos (editáveis) pra conferência antes de salvar.
-4. Usuário escolhe **Tipo** (Compensação/Ressarcimento) e **Operador**, e clica em Criar demanda.
-
-Não existe mais um botão "Extrair" — a extração roda sozinha ao colar/editar o texto.
+   - Os campos ficam preenchidos (editáveis) pra conferência antes de salvar. Não existe botão "Extrair" — roda sozinho ao colar/editar o texto.
+3. **Se Retificação:** o campo de colar texto **não aparece** (não é necessário informá-lo); em vez disso, mostra um campo de texto livre, sem limite de caracteres, perguntando "Como será feita a retificação?" — guardado em `retificacaoDetalhes`. Empresa, guia e siglas ficam pra preencher manualmente (sem auto-detecção, já que não há texto pra analisar).
+4. Em ambos os casos: Empresa (obrigatório), CNPJ, Guia, Siglas, **Urgência** (Baixa/Média/Alta — ver [[14 - Prioridade e Pausa com Gestor]]) e **Operador** (obrigatório), depois Criar demanda.
 
 ## Empresa: nunca é um chute
 

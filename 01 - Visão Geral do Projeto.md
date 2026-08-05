@@ -8,7 +8,7 @@ tags: [sistema-demandas, visão-geral]
 
 ## O problema que o sistema resolve
 
-A equipe recebe pedidos de **compensação** e **ressarcimento** de tributos por texto (colado de um grupo de mensagens). Cada mensagem geralmente contém, misturados no mesmo texto solto:
+A equipe recebe pedidos de **compensação** e **retificação** de tributos por texto (colado de um grupo de mensagens). Cada mensagem geralmente contém, misturados no mesmo texto solto:
 
 - o nome da empresa (às vezes com o CNPJ, às vezes só o nome);
 - o(s) código(s) da receita / guia de imposto envolvido(s);
@@ -27,18 +27,21 @@ Uma equipe pequena (múltiplas pessoas), cada uma com login próprio. Uma pessoa
 
 ## Os dois tipos de demanda
 
-- **Compensação** — ao finalizar, gera: `Empresa "X" - Compensada, SIGLA1/SIGLA2` (siglas dos impostos envolvidos, separadas por barra).
-- **Ressarcimento** — ao finalizar, gera: `Empresa "X" ressarcida, relatório no Bitrix.` (texto fixo, sem listar siglas).
+- **Compensação** — pede pra colar o texto recebido (o sistema identifica empresa/guia/siglas sozinho); ao finalizar, gera: `Empresa "X" - Compensada, SIGLA1/SIGLA2` (siglas dos impostos envolvidos, separadas por barra).
+- **Retificação** — não usa o texto colado; em vez disso, pede um campo de texto livre descrevendo como a retificação vai ser feita; ao finalizar, gera: `Empresa "X" retificada, relatório no Bitrix.` (texto fixo).
+
+A escolha do tipo agora é a **primeira pergunta** ao abrir "Nova demanda" — o resto do formulário só aparece depois de escolher, sem nenhum tipo pré-selecionado. Ver [[06 - Criação de Demandas]].
 
 Ver [[08 - Finalização e Mensagem Bitrix]] pro detalhe de como e por que esses dois formatos são diferentes.
 
 ## Os pilares do sistema
 
-1. **Quadro Kanban com cronômetro** — [[05 - Quadro Kanban e Cronômetro]]
-2. **Criação facilitada de demanda** (colar texto → sistema identifica empresa e guia sozinho) — [[06 - Criação de Demandas]]
+1. **Quadro Kanban com cronômetro que pausa de verdade** — [[05 - Quadro Kanban e Cronômetro]]
+2. **Criação facilitada de demanda** (colar texto → sistema identifica empresa e guia sozinho, só pra Compensação) — [[06 - Criação de Demandas]]
 3. **Cadastro de empresas próprio** (CNPJ + Nome) usado pra identificar a empresa no texto colado — [[07 - Cadastro de Empresas]]
 4. **Notificações em tempo real** entre todos os usuários logados — [[09 - Notificações em Tempo Real]]
 5. **Autenticação individual**, porque os dados são críticos e precisam de rastreabilidade real (quem fez o quê, quando) — [[04 - Autenticação e Usuários]]
+6. **Prioridade/urgência com ordem obrigatória e pausa com motivo pro gestor** — [[14 - Prioridade e Pausa com Gestor]]
 
 ## Trajetória do projeto (resumo)
 

@@ -9,8 +9,7 @@ tags: [sistema-demandas, pendências, todo]
 Lista do que é **sabidamente incompleto** hoje, organizada por nota relacionada.
 
 ## Dados
-- [ ] Reimportar a lista completa de empresas (~209) — a versão local antiga não migrou pro banco automaticamente. Ver [[07 - Cadastro de Empresas]].
-- [ ] Remover as empresas de teste usadas durante o desenvolvimento (RGS Engenharia, Cooperativa Agrícola do Sul foram usadas pra validar o sistema — mas também são empresas reais da lista, então provavelmente não precisam ser removidas, só conferir se os dados batem com o cadastro real).
+- [x] Reimportar a lista completa de empresas — já há demandas reais criadas referenciando empresas do cadastro (ex: Vitrine Móveis, RGS Engenharia). Ver [[07 - Cadastro de Empresas]].
 
 ## Autenticação — [[04 - Autenticação e Usuários]]
 - [ ] Tela de trocar senha.
@@ -24,13 +23,19 @@ Lista do que é **sabidamente incompleto** hoje, organizada por nota relacionada
 - [ ] Rate limiting no login.
 - [ ] Avaliar migrar de exposição pública pra Tailscale (rede privada já disponível na VPS).
 
-## Notificações — [[09 - Notificações em Tempo Real]]
-- [ ] Hoje é broadcast global (todo mundo vê tudo). Avaliar se faz sentido notificar só o operador responsável, ou manter global (pode ser intencional pra uma equipe pequena que quer visibilidade total).
-- [ ] Marcar notificação como lida por usuário — hoje "lida" é um estado único, compartilhado (marcar como lida pra um marca pra todos).
+## Notificações — [[09 - Notificações em Tempo Real]] · [[14 - Prioridade e Pausa com Gestor]]
+- [x] Motivo de pausa já é direcionado só pros gestores (não é mais só broadcast global).
+- [ ] Criação/movimentação/finalização continuam broadcast global (todo mundo vê tudo). Avaliar se faz sentido notificar só o operador responsável nesses casos também, ou manter global.
+- [ ] Marcar notificação como lida por usuário — hoje "lida" é um estado único, compartilhado (marcar como lida pra um marca pra todos, exceto as direcionadas que já são por usuário).
 
 ## Quadro Kanban — [[05 - Quadro Kanban e Cronômetro]]
 - [ ] Atualização otimista no drag-and-drop (hoje espera a resposta do servidor antes de mover visualmente).
 - [ ] Reordenar/editar as colunas pela interface (hoje são fixas, definidas no seed do banco).
+
+## Prioridade e Retificação — [[14 - Prioridade e Pausa com Gestor]] · [[06 - Criação de Demandas]]
+- [ ] O campo `retificacaoDetalhes` (como será feita a retificação) não é obrigatório hoje — avaliar se deveria ser.
+- [ ] A checagem de bloqueio por prioridade é global (considera todas as tarefas do sistema, não só as do operador). Confirmar se é o comportamento desejado pra equipes maiores.
+- [ ] Não há edição de colunas/etapas adicionais além de Baixa/Média/Alta — se precisar de mais granularidade, revisitar `PRIORITY_RANK`.
 
 ## Finalização — [[08 - Finalização e Mensagem Bitrix]]
 - [ ] Se algum dia fizer sentido, gerar um PDF de verdade no layout oficial do PER/DCOMP (hoje é só a mensagem de texto — decisão consciente, ver [[12 - Histórico de Decisões]]).

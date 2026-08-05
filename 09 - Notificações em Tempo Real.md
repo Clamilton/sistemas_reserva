@@ -10,7 +10,9 @@ tags: [sistema-demandas, notificações, websocket, técnico]
 
 Toda vez que uma demanda é **criada**, **movida** de coluna ou **finalizada**, o backend:
 1. Grava um registro em `Notification` (tipo, mensagem, data).
-2. Transmite esse evento **na hora**, via WebSocket (Socket.IO), pra **todos** os usuários com o site aberto.
+2. Transmite esse evento **na hora**, via WebSocket (Socket.IO), pra **todos** os usuários com o site aberto (broadcast global).
+
+Exceção: a notificação de **motivo de pausa** (com o texto completo do motivo) não é broadcast — é **direcionada só pros usuários gestores**. Ver [[14 - Prioridade e Pausa com Gestor]] pro detalhe de como isso funciona (sala por usuário no Socket.IO).
 
 Do lado do navegador, ao receber o evento:
 - aparece um **toast** com a mensagem;
@@ -27,9 +29,9 @@ O WebSocket usa o **mesmo cookie de sessão** do login normal (ver [[04 - Autent
 2. No servidor, um middleware do Socket.IO (`server/src/socket.ts`) lê o cookie manualmente do handshake, valida o JWT, confirma que o usuário existe — só então aceita a conexão.
 3. Conexão sem cookie válido é rejeitada (`"Não autenticado"`), sem derrubar o servidor.
 
-## Escopo do broadcast (limitação conhecida)
+## Escopo do broadcast (limitação parcialmente resolvida)
 
-Hoje o evento é **global** — todo usuário conectado recebe a notificação de **toda** demanda, não só das que ele criou ou é responsável. Pra uma equipe pequena isso tende a ser até desejável (todo mundo vê a atividade do time), mas não existe filtro por "só me avise das minhas". Ver [[13 - Pendências e Próximos Passos]].
+Os eventos de criação/movimentação/finalização continuam **globais** — todo usuário conectado recebe a notificação de **toda** demanda, não só das que ele criou ou é responsável. Pra uma equipe pequena isso tende a ser até desejável (todo mundo vê a atividade do time), mas não existe filtro por "só me avise das minhas". O motivo de pausa já é direcionado (só gestores) — ver [[14 - Prioridade e Pausa com Gestor]]. Restante da limitação em [[13 - Pendências e Próximos Passos]].
 
 ## Um bug real que apareceu aqui (vale registrar)
 
@@ -39,7 +41,7 @@ Hoje o evento é **global** — todo usuário conectado recebe a notificação d
 > Corrigido trocando pra `import { parse as parseCookies } from "cookie"` (import nomeado) e envolvendo o middleware inteiro num `try/catch` que sempre chama `next(err)` em vez de deixar a exceção escapar. Validado depois com testes de conexão autenticada e não-autenticada, confirmando que o container não cai mais.
 
 ## Onde está o código
-- `server/src/socket.ts` — servidor Socket.IO, autenticação do handshake, `broadcastNotification()`.
-- `server/src/routes/notifications.ts` — `pushNotification()` (grava no banco + chama o broadcast).
+- `server/src/socket.ts` — servidor Socket.IO, autenticação do handshake, `broadcastNotification()` (global) e `notifyUser()` (direcionada, sala `user:<id>`).
+- `server/src/routes/notifications.ts` — `pushNotification()` (global) e `pushNotificationToUsers()`/`notifyGestores()` (direcionadas).
 - `src/lib/socket.ts` — cliente (conecta/desconecta).
 - `src/App.tsx` — liga a conexão quando há usuário logado, ouve o evento `"notification"`.
