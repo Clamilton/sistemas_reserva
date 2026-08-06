@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { Copy, Trash2, X } from "lucide-react";
 import { useToastStore } from "../store/useToastStore";
 import { useAppStore } from "../store/useAppStore";
-import { useAuthStore } from "../store/useAuthStore";
 import type { Prioridade, Task } from "../types";
 import { computeElapsedMs, formatDateTime, formatDuration, useTicker } from "../lib/time";
 import { copyToClipboard } from "../lib/clipboard";
@@ -26,11 +25,24 @@ const PRIORITY_BUTTON_STYLES: Record<Prioridade, string> = {
 export function TaskDetailsModal({ task, onClose }: Props) {
   const pushToast = useToastStore((s) => s.push);
   const updateTaskPriority = useAppStore((s) => s.updateTaskPriority);
+  const delegateTask = useAppStore((s) => s.delegateTask);
   const deleteTask = useAppStore((s) => s.deleteTask);
-  const currentUser = useAuthStore((s) => s.user);
+  const operadores = useAppStore((s) => s.operadores);
   const now = useTicker(1000);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [delegating, setDelegating] = useState(false);
+
+  async function handleDelegate(operadorId: string) {
+    if (operadorId === task.operadorId) return;
+    setDelegating(true);
+    const ok = await delegateTask(task.id, operadorId);
+    setDelegating(false);
+    if (ok) {
+      const novo = operadores.find((op) => op.id === operadorId);
+      pushToast(`Demanda delegada para ${novo?.nome ?? "outro operador"}`);
+    }
+  }
 
   async function handleCopy() {
     if (!task.finalMessage) return;
@@ -107,8 +119,21 @@ export function TaskDetailsModal({ task, onClose }: Props) {
             </dd>
             <dt className="opacity-60">Origem da solicitação</dt>
             <dd className="text-right">{task.origemSolicitacao || "—"}</dd>
-            <dt className="opacity-60">Operador</dt>
-            <dd className="text-right">{task.operadorNome}</dd>
+            <dt className="opacity-60 self-center">Operador</dt>
+            <dd className="text-right">
+              <select
+                value={task.operadorId}
+                onChange={(e) => handleDelegate(e.target.value)}
+                disabled={delegating}
+                className="input h-auto w-full py-1 text-right text-sm"
+              >
+                {operadores.map((op) => (
+                  <option key={op.id} value={op.id}>
+                    {op.nome}
+                  </option>
+                ))}
+              </select>
+            </dd>
             <dt className="opacity-60">CNPJ</dt>
             <dd className="text-right">{task.cnpj || "—"}</dd>
             <dt className="opacity-60">Código da Receita (Guia)</dt>
@@ -200,39 +225,37 @@ export function TaskDetailsModal({ task, onClose }: Props) {
           )}
         </div>
 
-        {currentUser?.isGestor && (
-          <div className="dialog-actions justify-between">
-            {confirmingDelete ? (
-              <div className="flex w-full items-center justify-between gap-2">
-                <span className="text-sm text-red-700">Excluir esta demanda permanentemente?</span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setConfirmingDelete(false)}
-                    className="btn btn-secondary"
-                    disabled={deleting}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="btn bg-red-600 text-white hover:bg-red-700"
-                  >
-                    {deleting ? "Excluindo..." : "Confirmar exclusão"}
-                  </button>
-                </div>
+        <div className="dialog-actions justify-between">
+          {confirmingDelete ? (
+            <div className="flex w-full items-center justify-between gap-2">
+              <span className="text-sm text-red-700">Excluir esta demanda permanentemente?</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmingDelete(false)}
+                  className="btn btn-secondary"
+                  disabled={deleting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="btn bg-red-600 text-white hover:bg-red-700"
+                >
+                  {deleting ? "Excluindo..." : "Confirmar exclusão"}
+                </button>
               </div>
-            ) : (
-              <button
-                onClick={() => setConfirmingDelete(true)}
-                className="btn btn-ghost text-red-700 hover:bg-red-50"
-              >
-                <Trash2 size={14} />
-                Excluir demanda
-              </button>
-            )}
-          </div>
-        )}
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              className="btn btn-ghost text-red-700 hover:bg-red-50"
+            >
+              <Trash2 size={14} />
+              Excluir demanda
+            </button>
+          )}
+        </div>
       </motion.div>
     </motion.div>
   );

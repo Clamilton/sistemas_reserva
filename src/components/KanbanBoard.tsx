@@ -63,6 +63,7 @@ export function KanbanBoard({ filters }: Props) {
   const columns = useAppStore((s) => s.columns);
   const tasks = useAppStore((s) => s.tasks);
   const moveTask = useAppStore((s) => s.moveTask);
+  const marcarTaskVista = useAppStore((s) => s.marcarTaskVista);
   const currentUser = useAuthStore((s) => s.user);
   const pushToast = useToastStore((s) => s.push);
 
@@ -197,7 +198,10 @@ export function KanbanBoard({ filters }: Props) {
               column={column}
               tasks={tasksByColumn[column.id] ?? []}
               activeId={activeId}
-              onCardClick={setSelectedTask}
+              onCardClick={(task) => {
+                setSelectedTask(task);
+                marcarTaskVista(task.id);
+              }}
             />
           ))}
         </div>

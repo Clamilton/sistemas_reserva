@@ -1,7 +1,17 @@
 import { create } from "zustand";
-import type { AppNotification, Column, DemandType, Empresa, Operador, Prioridade, Task } from "../types";
+import type {
+  AppNotification,
+  Column,
+  DemandType,
+  Empresa,
+  Operador,
+  PerdcompLinha,
+  Prioridade,
+  Task,
+} from "../types";
 import * as api from "../lib/api";
 import { useToastStore } from "./useToastStore";
+import { getLastSeenAt, setLastSeenAt } from "../lib/lastSeen";
 
 interface NewTaskInput {
   empresa: string;
@@ -25,9 +35,12 @@ interface AppState {
   tasks: Task[];
   notifications: AppNotification[];
   loaded: boolean;
+  novosIds: Set<string>;
 
   hydrate: () => Promise<void>;
   refreshTasks: () => Promise<void>;
+  verificarNovasDemandas: () => void;
+  marcarTaskVista: (taskId: string) => void;
   refreshNotifications: () => Promise<void>;
   refreshEmpresas: () => Promise<void>;
   refreshOperadores: () => Promise<void>;
@@ -54,7 +67,8 @@ interface AppState {
     motivo?: string,
   ) => Promise<boolean>;
   updateTaskPriority: (taskId: string, prioridade: Prioridade) => Promise<void>;
-  finalizeTask: (taskId: string, message: string) => Promise<void>;
+  delegateTask: (taskId: string, operadorId: string) => Promise<boolean>;
+  finalizeTask: (taskId: string, message: string, perdcompDados?: PerdcompLinha[]) => Promise<void>;
   deleteTask: (taskId: string) => Promise<boolean>;
 
   markNotificationRead: (id: string) => Promise<void>;
@@ -73,6 +87,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   tasks: [],
   notifications: [],
   loaded: false,
+  novosIds: new Set(),
 
   hydrate: async () => {
     try {
@@ -84,6 +99,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         api.getNotifications(),
       ]);
       set({ columns, operadores, empresas, tasks, notifications, loaded: true });
+      get().verificarNovasDemandas();
     } catch (err) {
       reportError(err);
     }
@@ -91,10 +107,43 @@ export const useAppStore = create<AppState>()((set, get) => ({
 
   refreshTasks: async () => {
     try {
-      set({ tasks: await api.getTasks() });
+      const prevIds = new Set(get().tasks.map((t) => t.id));
+      const tasks = await api.getTasks();
+      const chegaramAgora = tasks.filter((t) => !prevIds.has(t.id)).map((t) => t.id);
+      set((s) => {
+        if (chegaramAgora.length === 0) return { tasks };
+        const next = new Set(s.novosIds);
+        chegaramAgora.forEach((id) => next.add(id));
+        return { tasks, novosIds: next };
+      });
     } catch (err) {
       reportError(err);
     }
+  },
+
+  /** Compara as tasks carregadas com a última vez que a aba esteve em foco
+   * — qualquer demanda criada nesse intervalo entra em novosIds (pisca no
+   * card até o usuário abrir a demanda). */
+  verificarNovasDemandas: () => {
+    const lastSeenAt = getLastSeenAt();
+    const recentes = get().tasks.filter((t) => new Date(t.createdAt).getTime() > lastSeenAt);
+    if (recentes.length > 0) {
+      set((s) => {
+        const next = new Set(s.novosIds);
+        recentes.forEach((t) => next.add(t.id));
+        return { novosIds: next };
+      });
+    }
+    setLastSeenAt(Date.now());
+  },
+
+  marcarTaskVista: (taskId) => {
+    set((s) => {
+      if (!s.novosIds.has(taskId)) return s;
+      const next = new Set(s.novosIds);
+      next.delete(taskId);
+      return { novosIds: next };
+    });
   },
 
   refreshNotifications: async () => {
@@ -215,9 +264,20 @@ export const useAppStore = create<AppState>()((set, get) => ({
     }
   },
 
-  finalizeTask: async (taskId, message) => {
+  delegateTask: async (taskId, operadorId) => {
     try {
-      await api.finalizeTask(taskId, message);
+      await api.delegateTask(taskId, operadorId);
+      await Promise.all([get().refreshTasks(), get().refreshNotifications()]);
+      return true;
+    } catch (err) {
+      reportError(err);
+      return false;
+    }
+  },
+
+  finalizeTask: async (taskId, message, perdcompDados) => {
+    try {
+      await api.finalizeTask(taskId, message, perdcompDados);
       await Promise.all([get().refreshTasks(), get().refreshNotifications()]);
     } catch (err) {
       reportError(err);

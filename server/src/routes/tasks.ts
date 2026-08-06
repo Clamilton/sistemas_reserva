@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db";
 import { requireAuth } from "../auth/middleware";
-import { pushNotification, notifyGestores } from "./notifications";
+import { pushNotification, notifyGestores, pushNotificationToUsers } from "./notifications";
 import { canMoveTask } from "../lib/permissions";
 import { logAudit } from "../lib/audit";
 
@@ -59,9 +59,8 @@ function findBlockingTask(
   return blockers[0];
 }
 
-tasksRouter.get("/", async (req, res) => {
+tasksRouter.get("/", async (_req, res) => {
   const tasks = await prisma.task.findMany({
-    where: req.user!.isGestor ? undefined : { operadorId: req.user!.id },
     include: taskInclude,
     orderBy: { order: "asc" },
   });
@@ -275,6 +274,7 @@ tasksRouter.patch("/:id/move", async (req, res) => {
 
 const finalizeSchema = z.object({
   message: z.string().min(1),
+  perdcompDados: z.array(z.object({ pa: z.string(), imposto: z.string(), valor: z.string() })).optional(),
 });
 
 tasksRouter.post("/:id/finalize", async (req, res) => {
@@ -296,6 +296,7 @@ tasksRouter.post("/:id/finalize", async (req, res) => {
       finishedAt: task.finishedAt ?? new Date(),
       finalMessage: parsed.data.message,
       finalizedById: req.user!.id,
+      ...(parsed.data.perdcompDados ? { perdcompDados: parsed.data.perdcompDados } : {}),
     },
     include: taskInclude,
   });
@@ -349,12 +350,62 @@ tasksRouter.patch("/:id/priority", async (req, res) => {
   res.json(updated);
 });
 
-tasksRouter.delete("/:id", async (req, res) => {
-  if (!req.user!.isGestor) {
-    res.status(403).json({ error: "Somente o gestor pode excluir demandas." });
+const delegateTaskSchema = z.object({
+  operadorId: z.string().min(1),
+});
+
+tasksRouter.patch("/:id/operador", async (req, res) => {
+  const parsed = delegateTaskSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Dados inválidos" });
     return;
   }
 
+  const before = await prisma.task.findUnique({
+    where: { id: req.params.id },
+    include: { operador: { select: { nome: true } } },
+  });
+  if (!before) {
+    res.status(404).json({ error: "Tarefa não encontrada" });
+    return;
+  }
+
+  const novoOperador = await prisma.user.findUnique({ where: { id: parsed.data.operadorId } });
+  if (!novoOperador) {
+    res.status(404).json({ error: "Operador não encontrado" });
+    return;
+  }
+
+  if (before.operadorId === novoOperador.id) {
+    const unchanged = await prisma.task.findUnique({ where: { id: before.id }, include: taskInclude });
+    res.json(unchanged);
+    return;
+  }
+
+  const updated = await prisma.task.update({
+    where: { id: before.id },
+    data: { operadorId: novoOperador.id },
+    include: taskInclude,
+  });
+
+  await logAudit({
+    actorId: req.user!.id,
+    actorNome: req.user!.nome,
+    action: "task.delegated",
+    entityType: "Task",
+    entityId: updated.id,
+    description: `Demanda "${updated.empresaNome || "(sem empresa)"}" delegada de ${before.operador.nome} para ${novoOperador.nome}.`,
+  });
+  await pushNotificationToUsers(
+    "delegated",
+    `Demanda "${updated.empresaNome || "(sem empresa)"}" foi delegada para você`,
+    [novoOperador.id],
+  );
+
+  res.json(updated);
+});
+
+tasksRouter.delete("/:id", async (req, res) => {
   const task = await prisma.task.findUnique({ where: { id: req.params.id } });
   if (!task) {
     res.status(404).json({ error: "Tarefa não encontrada" });

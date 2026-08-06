@@ -106,6 +106,12 @@ model Task {
   finalizedBy     User?     @relation("TaskFinalizedBy", fields: [finalizedById], references: [id])
   finalizedById   String?
 
+  /** Débitos extraídos dos PDFs de PER/DCOMP anexados ao finalizar esta
+   * demanda ({pa, imposto, valor}[], todos os PDFs já somados numa lista só)
+   * — usado pra somar automaticamente com outras compensações da mesma
+   * empresa no mesmo mês. */
+  perdcompDados Json?
+
   statusHistory StatusHistoryEntry[]
 }
 
@@ -128,6 +134,7 @@ enum NotificationType {
   moved
   finalized
   paused
+  delegated
 }
 
 model Notification {

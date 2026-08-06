@@ -15,6 +15,7 @@ interface ContentProps {
   faded?: boolean;
   locked?: boolean;
   dragOverlay?: boolean;
+  novo?: boolean;
 }
 
 const PRIORITY_INK: Record<Task["prioridade"], { bg: string; text: string; dot?: string }> = {
@@ -25,7 +26,7 @@ const PRIORITY_INK: Record<Task["prioridade"], { bg: string; text: string; dot?:
 
 const CARD_SPRING = { type: "spring" as const, stiffness: 500, damping: 34, mass: 0.7 };
 
-export function TaskCardContent({ task, onClick, faded, locked, dragOverlay }: ContentProps) {
+export function TaskCardContent({ task, onClick, faded, locked, dragOverlay, novo }: ContentProps) {
   const column = useAppStore((s) => s.columns.find((c) => c.id === task.columnId));
   const now = useTicker(1000);
 
@@ -48,7 +49,7 @@ export function TaskCardContent({ task, onClick, faded, locked, dragOverlay }: C
       title={locked ? "Demanda concluída — só o gestor pode movê-la" : undefined}
       className={`rounded-[12px] bg-neutral-100 p-3 transition-shadow ${
         dragOverlay ? "shadow-[var(--shadow-lg)]" : "elev-sm hover:shadow-[var(--shadow-md)]"
-      } ${locked ? "cursor-default" : "cursor-grab active:cursor-grabbing"}`}
+      } ${locked ? "cursor-default" : "cursor-grab active:cursor-grabbing"} ${novo ? "card-novo" : ""}`}
       style={pinfo.dot ? { borderLeft: `3px solid ${pinfo.dot}` } : undefined}
     >
       <div className="flex items-center justify-between gap-2">
@@ -121,6 +122,7 @@ interface Props {
 
 export function TaskCard({ task, onClick, dragging }: Props) {
   const column = useAppStore((s) => s.columns.find((c) => c.id === task.columnId));
+  const novo = useAppStore((s) => s.novosIds.has(task.id));
   const currentUser = useAuthStore((s) => s.user);
   const locked = column?.kind === "done" && !currentUser?.isGestor;
 
@@ -139,7 +141,7 @@ export function TaskCard({ task, onClick, dragging }: Props) {
 
   return (
     <div ref={setRefs} style={style} {...listeners} {...attributes}>
-      <TaskCardContent task={task} onClick={onClick} faded={isDragging || dragging} locked={locked} />
+      <TaskCardContent task={task} onClick={onClick} faded={isDragging || dragging} locked={locked} novo={novo} />
     </div>
   );
 }

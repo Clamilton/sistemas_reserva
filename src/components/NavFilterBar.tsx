@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Building2, LayoutGrid, ListFilter, Search, ShieldCheck, Users, X, BarChart3 } from "lucide-react";
+import { Building2, FileCog, LayoutGrid, ListFilter, Search, ShieldCheck, Users, X, BarChart3 } from "lucide-react";
 import { PRIORITY_LABEL } from "../lib/priority";
 import type { DemandType, Prioridade } from "../types";
 
-export type ViewKind = "kanban" | "relatorios" | "auditoria";
+export type ViewKind = "kanban" | "relatorios" | "auditoria" | "sped";
 
 const PRIO_OPTIONS: Prioridade[] = ["alta", "media", "baixa"];
 const TIPO_OPTIONS: DemandType[] = ["compensacao", "retificacao"];
@@ -89,6 +89,10 @@ export function NavFilterBar({
         <div onClick={() => onSetView("relatorios")} className={navItem(view === "relatorios")}>
           <BarChart3 size={16} strokeWidth={2.75} />
           Relatórios
+        </div>
+        <div onClick={() => onSetView("sped")} className={navItem(view === "sped")}>
+          <FileCog size={16} strokeWidth={2.75} />
+          SPED Retificador
         </div>
         <div onClick={onEmpresas} className={navItem(false)}>
           <Building2 size={16} strokeWidth={2.75} />

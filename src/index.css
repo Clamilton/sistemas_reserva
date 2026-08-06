@@ -130,6 +130,16 @@ a:hover { color: var(--color-accent-700); }
   100% { transform: scale(1.9); opacity: 0; }
 }
 
+/* Anel pulsante ao redor de cards de demandas recém-inseridas. */
+@keyframes cardBlink {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 65%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+}
+
 /* ─── Componentes semânticos do design system ───
    Em @layer components para que utilitários do Tailwind (ex: w-40, w-[150px])
    combinados na mesma className sempre vençam — regras fora de @layer têm
@@ -215,6 +225,10 @@ textarea.input { min-height: 90px; resize: vertical; border-radius: var(--radius
 .dialog-actions {
   display: flex; justify-content: flex-end; gap: 8px;
   border-top: 1px solid var(--color-divider); padding: 12px 20px; flex: none;
+}
+
+.card-novo {
+  animation: cardBlink 1.6s ease-in-out infinite;
 }
 
 }

@@ -6,6 +6,7 @@ import type {
   DemandType,
   Empresa,
   Operador,
+  PerdcompLinha,
   Prioridade,
   StatusHistoryEntry,
   Task,
@@ -159,6 +160,7 @@ interface ServerTask {
   finishedAt: string | null;
   finalMessage: string | null;
   finalizedBy: { id: string; nome: string } | null;
+  perdcompDados: PerdcompLinha[] | null;
   statusHistory: ServerStatusHistoryEntry[];
 }
 
@@ -198,6 +200,7 @@ function mapTask(t: ServerTask): Task {
     rawText: t.rawText,
     finalMessage: t.finalMessage,
     finalizedByNome: t.finalizedBy?.nome ?? null,
+    perdcompDados: t.perdcompDados,
   };
 }
 
@@ -247,10 +250,22 @@ export async function updateTaskPriority(taskId: string, prioridade: Prioridade)
   return mapTask(task);
 }
 
-export async function finalizeTask(taskId: string, message: string): Promise<Task> {
+export async function delegateTask(taskId: string, operadorId: string): Promise<Task> {
+  const task = await request<ServerTask>(`/tasks/${taskId}/operador`, {
+    method: "PATCH",
+    body: JSON.stringify({ operadorId }),
+  });
+  return mapTask(task);
+}
+
+export async function finalizeTask(
+  taskId: string,
+  message: string,
+  perdcompDados?: PerdcompLinha[],
+): Promise<Task> {
   const task = await request<ServerTask>(`/tasks/${taskId}/finalize`, {
     method: "POST",
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, perdcompDados }),
   });
   return mapTask(task);
 }

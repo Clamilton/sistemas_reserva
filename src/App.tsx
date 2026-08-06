@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Header } from "./components/Header";
 import { NavFilterBar, type ViewKind } from "./components/NavFilterBar";
@@ -14,6 +14,13 @@ import { useAuthStore } from "./store/useAuthStore";
 import { useAppStore } from "./store/useAppStore";
 import { useToastStore } from "./store/useToastStore";
 import { connectSocket, disconnectSocket } from "./lib/socket";
+import { notifyNewDemand, requestNotificationPermission } from "./lib/browserNotify";
+
+// Pesado (decimal.js + fflate) e usado só por quem navega até essa aba —
+// carrega sob demanda em vez de inflar o bundle inicial do Kanban.
+const SpedRetificador = lazy(() =>
+  import("./components/SpedRetificador").then((m) => ({ default: m.SpedRetificador })),
+);
 
 function App() {
   const user = useAuthStore((s) => s.user);
@@ -60,14 +67,36 @@ function App() {
       return;
     }
 
+    requestNotificationPermission();
+
     connectSocket((notification) => {
       pushToast(notification.message);
       refreshTasks();
       refreshNotifications();
+      if (notification.type === "created") {
+        notifyNewDemand(notification.message);
+      }
     });
 
     return () => disconnectSocket();
   }, [user, pushToast, refreshTasks, refreshNotifications]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        useAppStore.getState().verificarNovasDemandas();
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [user]);
 
   if (checking) {
     return <div className="min-h-screen bg-[color:var(--color-bg)]" />;
@@ -110,6 +139,11 @@ function App() {
         )}
         {loaded && view === "relatorios" && <Relatorios />}
         {loaded && view === "auditoria" && user.isGestor && <Auditoria />}
+        {loaded && view === "sped" && (
+          <Suspense fallback={<p className="p-6 text-sm opacity-60">Carregando...</p>}>
+            <SpedRetificador />
+          </Suspense>
+        )}
       </div>
 
       <AnimatePresence>

@@ -2,7 +2,7 @@ import { io, type Socket } from "socket.io-client";
 
 export interface SocketNotification {
   id: string;
-  type: "created" | "moved" | "finalized";
+  type: "created" | "moved" | "finalized" | "paused" | "delegated";
   message: string;
   createdAt: string;
   read: boolean;

@@ -5,8 +5,8 @@ export function buildFinalMessage(task: Task): string {
 
   if (task.tipo === "compensacao") {
     const siglas = task.siglasImpostos.length > 0 ? task.siglasImpostos.join("/") : task.guiaImposto;
-    return `Empresa "${empresa}" - Compensada, ${siglas}`;
+    return `*${empresa}* - Compensada, no bitrix(${siglas})`;
   }
 
-  return `Empresa "${empresa}" retificada, relatório no Bitrix.`;
+  return `*${empresa}* retificada, relatório no Bitrix.`;
 }

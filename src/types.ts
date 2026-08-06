@@ -32,6 +32,12 @@ export interface StatusHistoryEntry {
   changedByNome: string;
 }
 
+export interface PerdcompLinha {
+  pa: string;
+  imposto: string;
+  valor: string;
+}
+
 export interface Task {
   id: string;
   empresa: string;
@@ -55,9 +61,13 @@ export interface Task {
   rawText: string;
   finalMessage: string | null;
   finalizedByNome: string | null;
+  /** Débitos extraídos dos PDFs de PER/DCOMP anexados ao finalizar esta
+   * demanda — todos os PDFs já somados numa lista só (1 demanda = 1
+   * compensação, mesmo que tenha vários PDFs). */
+  perdcompDados: PerdcompLinha[] | null;
 }
 
-export type NotificationType = "created" | "moved" | "finalized" | "paused";
+export type NotificationType = "created" | "moved" | "finalized" | "paused" | "delegated";
 
 export interface AppNotification {
   id: string;
