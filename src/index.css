@@ -1,0 +1,220 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,500;0,600;0,700;1,500&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+
+:root {
+  color-scheme: light;
+
+  --color-bg: #faf6ee;
+  --color-surface: #ffffff;
+  --color-text: #1b2138;
+  --color-accent: #c1602f;
+  --color-accent-2: #203026;
+  --color-divider: #e8e1d2;
+
+  --color-header-bg: #0e1712;
+  --color-header-text: #f2ede1;
+
+  --color-neutral-100: #ffffff;
+  --color-neutral-200: #f2ecdf;
+  --color-neutral-300: #e8e1d2;
+  --color-neutral-400: #d3cabb;
+  --color-neutral-500: #a49c8d;
+  --color-neutral-600: #7d7669;
+  --color-neutral-700: #5a5548;
+  --color-neutral-800: #332f27;
+  --color-neutral-900: #1b2138;
+
+  --color-accent-100: #fbe6d8;
+  --color-accent-200: #f3caa9;
+  --color-accent-300: #e6a677;
+  --color-accent-400: #d47f4c;
+  --color-accent-500: #c1602f;
+  --color-accent-600: #a34e25;
+  --color-accent-700: #7a3a1c;
+  --color-accent-800: #502712;
+  --color-accent-900: #2b140a;
+
+  --color-accent-2-100: #dde5e0;
+  --color-accent-2-200: #b7c7bd;
+  --color-accent-2-300: #7d9587;
+  --color-accent-2-400: #3f5548;
+  --color-accent-2-500: #203026;
+  --color-accent-2-600: #182620;
+  --color-accent-2-700: #13201a;
+  --color-accent-2-800: #0e1712;
+  --color-accent-2-900: #0a100d;
+
+  --font-heading: "Newsreader", serif;
+  --font-body: "Inter Tight", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 28px;
+
+  --shadow-sm: 0 1px 3px rgba(27, 33, 56, 0.08);
+  --shadow-md: 0 6px 18px rgba(27, 33, 56, 0.1);
+  --shadow-lg: 0 18px 40px rgba(27, 33, 56, 0.14);
+}
+
+/* Expõe as rampas de cor como utilitários Tailwind (bg-accent-100, text-neutral-700, etc). */
+@theme {
+  --color-bg: #faf6ee;
+  --color-surface: #ffffff;
+  --color-ink: #1b2138;
+
+  --color-accent: #c1602f;
+  --color-accent-2: #203026;
+
+  --color-neutral-100: #ffffff;
+  --color-neutral-200: #f2ecdf;
+  --color-neutral-300: #e8e1d2;
+  --color-neutral-400: #d3cabb;
+  --color-neutral-500: #a49c8d;
+  --color-neutral-600: #7d7669;
+  --color-neutral-700: #5a5548;
+  --color-neutral-800: #332f27;
+  --color-neutral-900: #1b2138;
+
+  --color-accent-100: #fbe6d8;
+  --color-accent-200: #f3caa9;
+  --color-accent-300: #e6a677;
+  --color-accent-400: #d47f4c;
+  --color-accent-500: #c1602f;
+  --color-accent-600: #a34e25;
+  --color-accent-700: #7a3a1c;
+  --color-accent-800: #502712;
+  --color-accent-900: #2b140a;
+
+  --color-accent-2-100: #dde5e0;
+  --color-accent-2-200: #b7c7bd;
+  --color-accent-2-300: #7d9587;
+  --color-accent-2-400: #3f5548;
+  --color-accent-2-500: #203026;
+  --color-accent-2-600: #182620;
+  --color-accent-2-700: #13201a;
+  --color-accent-2-800: #0e1712;
+  --color-accent-2-900: #0a100d;
+
+  --font-heading: "Newsreader", serif;
+  --font-body: "Inter Tight", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+h1, h2, h3, h4 { font-family: var(--font-heading); font-weight: 500; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--color-neutral-400); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+
+a { color: var(--color-accent); text-underline-offset: 3px; }
+a:hover { color: var(--color-accent-700); }
+
+@keyframes pulseRing {
+  0% { transform: scale(0.6); opacity: .6; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+/* ─── Componentes semânticos do design system ───
+   Em @layer components para que utilitários do Tailwind (ex: w-40, w-[150px])
+   combinados na mesma className sempre vençam — regras fora de @layer têm
+   prioridade incondicional sobre qualquer camada do Tailwind, o que travava
+   larguras/paddings customizados (ex: selects de filtro esticando a 100%). */
+@layer components {
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+  font-family: var(--font-heading); font-weight: 500;
+  font-size: 14px; line-height: 1.2; color: var(--color-text);
+  background: transparent; border: 1px solid transparent;
+  padding: 9px 15px; border-radius: 12px;
+}
+.btn svg { display: block; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--color-accent); color: var(--color-bg); }
+.btn-primary:hover:not(:disabled) { background: var(--color-accent-600); }
+.btn-primary:active:not(:disabled) { background: var(--color-accent-700); }
+.btn-secondary { border-color: var(--color-divider); }
+.btn-secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.btn-secondary:active:not(:disabled) { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+.btn-ghost { color: var(--color-accent); padding-inline: 6px; }
+.btn-ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.btn-dark { background: var(--color-neutral-900); color: var(--color-neutral-100); }
+.btn-dark:hover:not(:disabled) { background: var(--color-neutral-800); }
+.btn-icon { width: 36px; height: 36px; padding: 0; }
+
+.field > label {
+  display: block; font-size: 12px; margin-bottom: 5px;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.input {
+  width: 100%; min-height: 38px; padding: 7px 14px; font: inherit;
+  font-size: 14px; color: var(--color-text); caret-color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider); border-radius: 12px;
+}
+.input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
+textarea.input { min-height: 90px; resize: vertical; border-radius: var(--radius-md); }
+
+.card {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 13px; border-radius: 12px; background: var(--color-surface);
+}
+.card-kicker { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent); }
+.card-title { font-family: var(--font-heading); font-weight: 500; font-size: 17px; line-height: 1.2; }
+.elev-sm { box-shadow: var(--shadow-sm); }
+.elev-md { box-shadow: var(--shadow-md); }
+.elev-lg { box-shadow: var(--shadow-lg); }
+
+.tag {
+  display: inline-flex; align-items: center; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.02em; padding: 3px 10px; border-radius: 999px;
+}
+.tag-accent { background: var(--color-accent-100); color: var(--color-accent-800); }
+.tag-accent-2 { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
+.tag-neutral { background: var(--color-neutral-100); color: var(--color-neutral-800); }
+.tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
+
+.dialog-backdrop {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--color-neutral-900) 50%, transparent);
+}
+.dialog {
+  width: 100%; display: flex; flex-direction: column;
+  border-radius: calc(var(--radius-lg) * 1.15);
+  background: var(--color-surface); box-shadow: var(--shadow-lg);
+  max-height: 90vh; overflow: hidden;
+}
+.dialog-header {
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--color-divider); padding: 16px 20px; flex: none;
+}
+.dialog-title { font-family: var(--font-heading); font-weight: 500; font-size: 19px; }
+.dialog-body {
+  padding: 16px 20px; display: flex; flex-direction: column; gap: 16px;
+  overflow-y: auto; min-height: 0;
+}
+.dialog-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  border-top: 1px solid var(--color-divider); padding: 12px 20px; flex: none;
+}
+
+}

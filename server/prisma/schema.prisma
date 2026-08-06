@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  nome         String
+  isGestor     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  tasksCreated      Task[]                @relation("TaskCreatedBy")
+  tasksAssigned     Task[]                @relation("TaskAssignedTo")
+  statusChanges     StatusHistoryEntry[]
+  finalizedTasks    Task[]                @relation("TaskFinalizedBy")
+  notifications     Notification[]        @relation("NotificationRecipient")
+  auditLogs         AuditLog[]            @relation("AuditActor")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  actor       User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId     String?
+  actorNome   String
+  action      String
+  entityType  String
+  entityId    String?
+  description String
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}
+
+model Empresa {
+  id        String   @id @default(uuid())
+  cnpj      String   @unique
+  nome      String
+  createdAt DateTime @default(now())
+
+  tasks Task[]
+}
+
+enum DemandType {
+  compensacao
+  retificacao
+}
+
+enum Prioridade {
+  baixa
+  media
+  alta
+}
+
+enum ColumnKind {
+  queue
+  active
+  paused
+  done
+}
+
+model Column {
+  id    String     @id
+  title String
+  kind  ColumnKind
+  order Int        @default(0)
+
+  tasks Task[]
+}
+
+model Task {
+  id            String      @id @default(uuid())
+  empresaNome   String
+  cnpj          String
+  empresa       Empresa?    @relation(fields: [empresaId], references: [id])
+  empresaId     String?
+  guiaImposto   String
+  siglasImpostos String[]
+  tipo          DemandType
+  retificacaoDetalhes String?
+  prioridade    Prioridade  @default(media)
+  rawText       String
+  origemSolicitacao String  @default("Grupo de Comunicação e Atendimento")
+
+  columnId String
+  column   Column @relation(fields: [columnId], references: [id])
+  order    Int
+
+  createdAt  DateTime @default(now())
+  createdBy  User     @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  createdById String
+
+  operador   User   @relation("TaskAssignedTo", fields: [operadorId], references: [id])
+  operadorId String
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  finalMessage    String?
+  finalizedBy     User?     @relation("TaskFinalizedBy", fields: [finalizedById], references: [id])
+  finalizedById   String?
+
+  statusHistory StatusHistoryEntry[]
+}
+
+model StatusHistoryEntry {
+  id          String     @id @default(uuid())
+  task        Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId      String
+  columnId    String
+  columnTitle String
+  columnKind  ColumnKind
+  motivo      String?
+  enteredAt   DateTime   @default(now())
+  exitedAt    DateTime?
+  changedBy   User       @relation(fields: [changedById], references: [id])
+  changedById String
+}
+
+enum NotificationType {
+  created
+  moved
+  finalized
+  paused
+}
+
+model Notification {
+  id            String            @id @default(uuid())
+  type          NotificationType
+  message       String
+  createdAt     DateTime          @default(now())
+  read          Boolean           @default(false)
+  recipient     User?             @relation("NotificationRecipient", fields: [recipientUserId], references: [id])
+  recipientUserId String?
+}

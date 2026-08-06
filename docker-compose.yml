@@ -1,0 +1,41 @@
+services:
+  demandas-db:
+    image: postgres:15-alpine
+    container_name: demandas-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: demandas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: demandas
+    volumes:
+      - demandas-db-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    networks:
+      - demandas-net
+
+  demandas-api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: demandas-api
+    restart: unless-stopped
+    depends_on:
+      - demandas-db
+    environment:
+      DATABASE_URL: postgresql://demandas:${POSTGRES_PASSWORD_ENCODED}@demandas-db:5432/demandas
+      JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: production
+      PORT: 4000
+      COOKIE_SECURE: "false"
+    ports:
+      - "5173:4000"
+    networks:
+      - demandas-net
+
+networks:
+  demandas-net:
+    driver: bridge
+
+volumes:
+  demandas-db-data:
