@@ -10,9 +10,25 @@ tags: [sistema-demandas, segurança, técnico]
 
 - **Toda rota de dados exige login** (`requireAuth` — cookie de sessão válido). Sem sessão, `401`.
 - **Senhas** nunca em texto puro — hash com `bcrypt`.
-- **Autoria de ações nunca vem do cliente.** `createdById`, `changedById`, `finalizedById` são sempre preenchidos no backend a partir da sessão autenticada — mesmo que alguém manipule a requisição manualmente, não dá pra "assinar" uma ação em nome de outra pessoa.
+- **Autoria de ações nunca vem do cliente.** `createdById`, `changedById`, `finalizedById`, `actorId` (auditoria) são sempre preenchidos no backend a partir da sessão autenticada — mesmo que alguém manipule a requisição manualmente, não dá pra "assinar" uma ação em nome de outra pessoa.
 - **Banco de dados isolado**, sem porta pública (só `127.0.0.1:5433`, acessível apenas de dentro da própria VPS).
 - Cadastro de novo usuário exige estar **logado** (não é público).
+- **SPED e PER/DCOMP nunca sobem pro servidor.** Os dados fiscais desses documentos (CNPJ, valores, escrituração) são processados inteiramente no navegador — ver [[16 - SPED Retificador]] e [[17 - Compensação via PER-DCOMP]].
+
+## Modelo de permissões por ação
+
+| Ação | Quem pode |
+|---|---|
+| Ver todas as demandas | Qualquer usuário autenticado (aberto pra todos — existiu uma fase em que cada operador só via as próprias) |
+| Criar demanda | Qualquer usuário autenticado |
+| Excluir demanda | Qualquer usuário autenticado |
+| Delegar (trocar operador) demanda existente | Qualquer usuário autenticado |
+| Mover demanda já **Concluída** pra outra coluna | Só gestor |
+| Ver [[15 - Auditoria]] | Só gestor |
+| Cadastrar/promover usuário gestor | Qualquer usuário autenticado (ver [[13 - Pendências e Próximos Passos]] — ponto em aberto) |
+
+> [!note] Por que exclusão e delegação foram abertas pra todo mundo
+> Inicialmente restritas a gestor, foram liberadas por pedido explícito do usuário — decisão de produto (equipe pequena, confiança entre os membros), não uma falha encontrada. Continua registrado em [[15 - Auditoria]] quem excluiu/delegou o quê, então a ação continua rastreável mesmo sem a restrição.
 
 ## O que NÃO está protegido (riscos conhecidos e aceitos)
 

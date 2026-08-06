@@ -32,6 +32,9 @@ Hub central da documentação do **Controle de Demandas**: sistema web para gere
 - [[08 - Finalização e Mensagem Bitrix]]
 - [[09 - Notificações em Tempo Real]]
 - [[14 - Prioridade e Pausa com Gestor]]
+- [[15 - Auditoria]]
+- [[16 - SPED Retificador]]
+- [[17 - Compensação via PER-DCOMP]]
 
 ## Acesso rápido
 
@@ -46,4 +49,5 @@ Hub central da documentação do **Controle de Demandas**: sistema web para gere
 | Primeiro usuário | `clailton` (senha entregue via chat na configuração inicial — trocar e usar gerenciador de senhas) |
 
 ## Repositórios externos relacionados
-- `github.com/Clamilton/compensacao` — ferramentas Python/Streamlit já existentes (Processador de PER/DCOMP, Distribuidor de Crédito PIS/COFINS). A tabela de códigos de receita usada em [[06 - Criação de Demandas]] foi extraída de lá.
+- `github.com/Clamilton/compensacao` — ferramentas Python/Streamlit já existentes (Processador de PER/DCOMP, Distribuidor de Crédito PIS/COFINS). A tabela de códigos de receita usada em [[06 - Criação de Demandas]] veio de lá, e a extração de PDF de [[17 - Compensação via PER-DCOMP]] é uma porta direta de `pages/_Processador_PERDCOMP.py`.
+- `sped-retificador/` (pasta neste mesmo repositório) — ferramenta desktop em Python original, cuja lógica de negócio foi portada em [[16 - SPED Retificador]].

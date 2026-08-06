@@ -17,6 +17,7 @@ erDiagram
     User ||--o{ Task : "finaliza (finalizedBy)"
     User ||--o{ StatusHistoryEntry : "muda status (changedBy)"
     User ||--o{ Notification : "recebe (se direcionada)"
+    User ||--o{ AuditLog : "autor (actor)"
     Empresa |o--o{ Task : "referenciada por"
     Column ||--o{ Task : "contém"
     Task ||--o{ StatusHistoryEntry : "tem histórico"
@@ -47,11 +48,13 @@ erDiagram
         string_array siglasImpostos
         enum tipo
         string retificacaoDetalhes
+        string origemSolicitacao
         enum prioridade
         string rawText
         datetime startedAt
         datetime finishedAt
         string finalMessage
+        json perdcompDados
     }
     StatusHistoryEntry {
         string id
@@ -61,6 +64,15 @@ erDiagram
         string motivo
         datetime enteredAt
         datetime exitedAt
+    }
+    AuditLog {
+        string id
+        datetime createdAt
+        string actorNome
+        string action
+        string entityType
+        string entityId
+        string description
     }
 ```
 
@@ -105,20 +117,26 @@ A entidade central. Campos importantes:
 | `siglasImpostos` | array de siglas, ex: `["IRPJ", "CSLL"]` |
 | `tipo` | `compensacao` \| `retificacao` (renomeado de `ressarcimento` — ver [[12 - Histórico de Decisões]]) |
 | `retificacaoDetalhes` | texto livre, sem limite, só preenchido quando `tipo = retificacao` — descreve como a retificação vai ser feita |
+| `origemSolicitacao` | de onde veio o pedido — padrão `"Grupo de Comunicação e Atendimento"`, ou texto livre quando "Outros" é escolhido na criação |
 | `prioridade` | `baixa` \| `media` \| `alta` — controla a ordem obrigatória de início, ver [[14 - Prioridade e Pausa com Gestor]] |
 | `rawText` | o texto original colado — só usado/preenchido pra Compensação; guardado pra auditoria |
+| `createdAt` | data/hora de criação — **editável** na criação da demanda (pra registrar retroativamente um pedido recebido antes de virar tarefa no sistema); usada também pra agrupar compensações por mês, ver [[17 - Compensação via PER-DCOMP]] |
 | `createdById` | **quem criou** — sempre o usuário autenticado, nunca um campo enviado pelo cliente |
-| `operadorId` | quem está designado a trabalhar a demanda (escolhido num dropdown ao criar) |
+| `operadorId` | quem está designado a trabalhar a demanda (escolhido num dropdown ao criar) — pode ser **redelegado** depois pra outro usuário, ver [[11 - Segurança]] |
 | `startedAt` / `finishedAt` | preenchidos automaticamente pelas regras do Kanban |
 | `finalMessage` | a mensagem final gerada (Bitrix) |
 | `finalizedById` | quem confirmou a finalização |
+| `perdcompDados` | débitos extraídos dos PDFs de PER/DCOMP anexados ao finalizar (`{pa, imposto, valor}[]`) — só preenchido pra Compensação quando o fluxo de upload é usado. Ver [[17 - Compensação via PER-DCOMP]] |
 
 ### `StatusHistoryEntry` (histórico de status)
 Uma linha por passagem da tarefa por uma coluna. Registra `enteredAt`/`exitedAt`, **`changedById`** (sempre o usuário autenticado que fez a ação, nunca informação vinda do front), **`columnKind`** (cópia do tipo da coluna no momento — usada pra somar só os períodos "ativos" no cálculo de tempo trabalhado) e **`motivo`** (preenchido só na entrada que representa uma pausa). É essa tabela que permite responder "quanto tempo ficou em cada etapa", "quem moveu pra onde" e "por que foi pausada".
 
 ### `Notification`
-Log de eventos (`created`, `moved`, `finalized`, `paused`) com mensagem pronta pra exibir. A maioria é **global** (todo mundo vê), exceto a notificação de tipo `paused` com o motivo, que é **direcionada** só pros usuários com `isGestor = true` via `recipientUserId` (ver [[14 - Prioridade e Pausa com Gestor]]).
+Log de eventos (`created`, `moved`, `finalized`, `paused`, `delegated`) com mensagem pronta pra exibir. A maioria é **global** (todo mundo vê), exceto `paused` (motivo, direcionada só pros gestores) e `delegated` (direcionada só pro novo operador da demanda) — ambas via `recipientUserId`. Ver [[14 - Prioridade e Pausa com Gestor]] e [[11 - Segurança]].
+
+### `AuditLog`
+Log cronológico, só de leitura, de ações administrativas relevantes (criação/exclusão de demanda, cadastro/exclusão de empresa, criação de usuário, mudança de poder de gestor, etc.) — diferente do `StatusHistoryEntry`, que é só o trajeto de uma tarefa pelo Kanban. Tela restrita a gestores. Ver [[15 - Auditoria]].
 
 ## Regra de ouro do schema
 
-> Nenhum campo de "quem fez a ação" (`createdById`, `changedById`, `finalizedById`) é aceito vindo do cliente. Todos são preenchidos no backend a partir do usuário autenticado na sessão. Essa é a base técnica que sustenta "provar quem fez o quê" — ver [[04 - Autenticação e Usuários]] e [[11 - Segurança]].
+> Nenhum campo de "quem fez a ação" (`createdById`, `changedById`, `finalizedById`, `actorId`) é aceito vindo do cliente. Todos são preenchidos no backend a partir do usuário autenticado na sessão. Essa é a base técnica que sustenta "provar quem fez o quê" — ver [[04 - Autenticação e Usuários]] e [[11 - Segurança]].

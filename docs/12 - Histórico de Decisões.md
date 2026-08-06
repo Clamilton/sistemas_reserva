@@ -74,3 +74,45 @@ A escolha de Compensação/Retificação virou a **primeira pergunta** da tela d
 ## 13. Campo de detalhes da retificação, sem o texto colado
 
 Como Retificação não depende de identificar automaticamente a empresa a partir de um texto de grupo (diferente de Compensação), dois ajustes: um campo de texto livre, sem limite de caracteres, perguntando "Como será feita a retificação?" (só aparece pra esse tipo); e o campo "Cole o texto recebido" (com toda a extração automática de empresa/guia/siglas) passou a **não aparecer** quando o tipo é Retificação, já que não é necessário informá-lo — Empresa, CNPJ, Guia e Siglas continuam disponíveis, só que preenchidos manualmente nesse caso.
+
+## 14. Log de auditoria separado do histórico de status
+
+O `StatusHistoryEntry` já registrava a passagem de uma tarefa pelo Kanban, mas não cobria ações administrativas (exclusão de demanda, cadastro/exclusão de empresa, criação de usuário, mudança de poder de gestor). Criado um log próprio, só de leitura (`AuditLog`), com um helper único (`logAudit()`) chamado no fim de cada rota relevante — decisão explícita de que uma falha ao gravar o log **nunca** deveria derrubar a ação principal que o usuário pediu. Tela restrita a gestor. Detalhe em [[15 - Auditoria]].
+
+## 15. Origem da solicitação e data de criação editável
+
+Dois campos adicionados na criação da demanda: **Origem da solicitação** (de onde veio o pedido — padrão "Grupo de Comunicação e Atendimento", com opção de texto livre) e a possibilidade de **editar a data de criação** (`createdAt`) — pra registrar retroativamente um pedido que chegou antes de virar tarefa no sistema, em vez de forçar a hora exata do clique em "Criar". Ver [[06 - Criação de Demandas]].
+
+## 16. Filtro de data com opção "Todos"
+
+A barra de filtros do Kanban ganhou um intervalo de datas; a opção **"Todos"** foi pedida separadamente, pra limpar o intervalo e considerar o histórico completo sem precisar escolher uma data bem antiga manualmente. Ver [[05 - Quadro Kanban e Cronômetro]].
+
+## 17. Visibilidade das demandas: restrita, depois reaberta pra todos
+
+Numa fase intermediária, cada operador só via as demandas atribuídas a ele mesmo (gestores viam tudo). Foi pedido explicitamente reverter isso: **todo mundo vê todas as demandas**, independente de quem seja o operador — decisão de produto pra uma equipe pequena, onde ver o quadro completo é mais útil do que isolar por responsável. Ver [[05 - Quadro Kanban e Cronômetro]].
+
+## 18. Porta do SPED Retificador (Python → TypeScript)
+
+Pedido pra portar a ferramenta desktop `sped_retificador.py`/`calc_tributaria.py` (pasta `sped-retificador/` deste repositório) pra dentro do site, como mais uma página, rodando inteiramente no navegador (SPED contém dado fiscal sensível — decisão de nunca subir esse arquivo pro backend). Validado byte a byte contra o Python original em vários cenários sintéticos antes de considerar pronto.
+
+Um SPED de produção real, testado depois, expôs um bug que o teste sintético não cobria: o código (**igual no Python e na porta**) inseria o registro novo `0500` sempre "logo antes do `0990`", sem considerar que um `0900` podia estar no meio do caminho — quebrando a ordem oficial do bloco 0 e sendo rejeitado pelo validador da Receita. Corrigido inserindo antes do primeiro entre `0600`/`0900`/`0990`. Detalhe completo (incluindo por que o teste sintético não pegou o bug) em [[16 - SPED Retificador]].
+
+## 19. Permissões abertas: criar, excluir e delegar demanda
+
+Exclusão e delegação (trocar o operador de uma demanda já existente) eram restritas a gestor; abertas pra **qualquer usuário autenticado** por pedido explícito — equipe pequena, confiança entre os membros, e toda ação continua rastreável em [[15 - Auditoria]] mesmo sem a restrição. Delegação também passou a gerar uma notificação direcionada só pro novo operador. Ver [[11 - Segurança]].
+
+## 20. Notificação nativa do navegador + cards piscando
+
+Pedido de dois reforços visuais pra "chegou demanda nova": uma notificação do sistema operacional (Notification API do navegador, pedida a permissão no login, disparada só quando a aba não está em foco pra não duplicar aviso) e um anel pulsante ao redor do card enquanto ele for "novo" — critério: `createdAt` mais recente que a última vez que o usuário teve a aba em foco (`localStorage`), cobrindo tanto quem está vendo em tempo real quanto quem reabre a aba depois de ausente. Ver [[09 - Notificações em Tempo Real]].
+
+## 21. Compensação via PER/DCOMP: da extração ao texto pronto
+
+A finalização de uma Compensação sempre exigiu escrever à mão um resumo dos valores compensados, olhando PDF por PDF do PER/DCOMP. Pedido pra portar a extração de uma ferramenta Python própria já existente (`github.com/Clamilton/compensacao`) e, a partir dela, **gerar o texto pronto** direto no modal de finalização — mesmo princípio de processamento 100% no navegador do item 18.
+
+Levou várias rodadas de ajuste depois da primeira versão funcionar:
+- A mensagem de PER/DCOMP estava **sobrescrevendo** a mensagem de conclusão no mesmo campo — viraram dois campos/botões de copiar independentes (ver [[08 - Finalização e Mensagem Bitrix]]).
+- A contagem de "2ª/3ª compensação" primeiro considerava cada **PDF** como uma compensação — depois passou a considerar cada **demanda** (soltar vários PDFs na mesma demanda vira 1 bloco só; só conta como 2ª/3ª quando existe outra demanda da mesma empresa já finalizada no mesmo mês). Exigiu guardar (`Task.perdcompDados`) os débitos extraídos em cada demanda, pra recuperar depois.
+- O rótulo do responsável oscilou entre "USUÁRIO QUE CONCLUIU DEMANDA" (só no caso de 1 única compensação) e "RESPONSÁVEL" (2+) — simplificado pra **sempre "RESPONSÁVEL"**, sempre com o operador da demanda, sempre em maiúsculo.
+- Testado contra um PER/DCOMP real (não só dados sintéticos), o que expôs dois problemas de classificação de imposto no dicionário original (código `1082` mal rotulado, e várias entidades de "CP Terceiros" sem cobertura) — corrigidos priorizando o texto do PDF sobre o código quando o assunto é "CP ...", que agora vira uma única linha "INSS".
+
+Detalhe técnico completo, incluindo os bugs encontrados com o PDF real, em [[17 - Compensação via PER-DCOMP]].

@@ -14,7 +14,7 @@ tags: [sistema-demandas, criação-de-demanda, técnico]
    - tenta achar o **Código da Receita** (guia) e resolve a(s) **sigla(s)** do imposto.
    - Os campos ficam preenchidos (editáveis) pra conferência antes de salvar. Não existe botão "Extrair" — roda sozinho ao colar/editar o texto.
 3. **Se Retificação:** o campo de colar texto **não aparece** (não é necessário informá-lo); em vez disso, mostra um campo de texto livre, sem limite de caracteres, perguntando "Como será feita a retificação?" — guardado em `retificacaoDetalhes`. Empresa, guia e siglas ficam pra preencher manualmente (sem auto-detecção, já que não há texto pra analisar).
-4. Em ambos os casos: Empresa (obrigatório), CNPJ, Guia, Siglas, **Urgência** (Baixa/Média/Alta — ver [[14 - Prioridade e Pausa com Gestor]]) e **Operador** (obrigatório), depois Criar demanda.
+4. Em ambos os casos: Empresa (obrigatório), CNPJ, Guia, Siglas, **Urgência** (Baixa/Média/Alta — ver [[14 - Prioridade e Pausa com Gestor]]), **Origem da solicitação** (padrão "Grupo de Comunicação e Atendimento", ou texto livre em "Outros"), **Criado em** (data/hora, editável — pra registrar retroativamente um pedido recebido antes de virar tarefa) e **Operador** (obrigatório), depois Criar demanda.
 
 ## Empresa: nunca é um chute
 
@@ -58,6 +58,9 @@ Tabela replicada em `src/lib/taxCodes.ts`:
 
 > [!note] Ponto em aberto
 > No dicionário original em Python, o código `5952` aparecia duas vezes (`"PIS/COFINS/CSLL"` e depois `"CSRF"`); como chave duplicada num dict Python, a segunda sobrescreve a primeira. Foi replicado igual aqui (resolve pra `CSRF`), mas vale confirmar se isso é o comportamento correto na fonte original.
+
+> [!warning] `1082`/`1170` como "CP TERCEIROS" — conferir contra um PER/DCOMP real
+> Testando a extração equivalente em [[17 - Compensação via PER-DCOMP]] contra um PDF real, o código `1082` se mostrou **"CP Segurados"**, não "CP Terceiros" — o dicionário original parece ter esse código errado. Essa tabela (`taxCodes.ts`) ainda não foi corrigida, porque alimenta só a sigla mostrada no card da demanda (não afeta valores calculados); vale revisar se motiva confusão no dia a dia.
 
 ## Onde está o código
 - `src/components/NewTaskModal.tsx` — tela e orquestração.

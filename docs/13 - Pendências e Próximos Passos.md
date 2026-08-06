@@ -25,6 +25,8 @@ Lista do que é **sabidamente incompleto** hoje, organizada por nota relacionada
 
 ## Notificações — [[09 - Notificações em Tempo Real]] · [[14 - Prioridade e Pausa com Gestor]]
 - [x] Motivo de pausa já é direcionado só pros gestores (não é mais só broadcast global).
+- [x] Delegação de demanda já é direcionada só pro novo operador.
+- [x] Notificação nativa do navegador quando chega demanda nova (com a aba fora de foco) + cards recém-criados piscando.
 - [ ] Criação/movimentação/finalização continuam broadcast global (todo mundo vê tudo). Avaliar se faz sentido notificar só o operador responsável nesses casos também, ou manter global.
 - [ ] Marcar notificação como lida por usuário — hoje "lida" é um estado único, compartilhado (marcar como lida pra um marca pra todos, exceto as direcionadas que já são por usuário).
 
@@ -39,6 +41,18 @@ Lista do que é **sabidamente incompleto** hoje, organizada por nota relacionada
 
 ## Finalização — [[08 - Finalização e Mensagem Bitrix]]
 - [ ] Se algum dia fizer sentido, gerar um PDF de verdade no layout oficial do PER/DCOMP (hoje é só a mensagem de texto — decisão consciente, ver [[12 - Histórico de Decisões]]).
+
+## Compensação via PER/DCOMP — [[17 - Compensação via PER-DCOMP]]
+- [ ] Só compensações finalizadas **usando esse fluxo** (com `perdcompDados` salvo) entram na soma automática por empresa/mês — compensações antigas ou finalizadas sem anexar PDF ficam de fora.
+- [ ] A extração de texto do PDF via `pdfjs-dist` não é garantidamente idêntica à do `pdfplumber` usado na ferramenta Python original — validada contra alguns PDFs reais, mas formatos de PER/DCOMP muito diferentes podem exigir ajuste no agrupamento de linhas.
+- [ ] O de-para de código de receita → imposto (`extractor.ts`) só foi conferido contra PDFs com débitos de CP Patronal/Segurados/Terceiros — vale revisar contra um PDF real com IRRF/PIS/COFINS/IRPJ/CSLL/CSRF quando aparecer um.
+- [ ] Tabela equivalente em `src/lib/taxCodes.ts` (usada na criação da demanda, não na finalização) ainda tem o mesmo código `1082` mal classificado — ver nota em [[06 - Criação de Demandas]].
+
+## SPED Retificador — [[16 - SPED Retificador]]
+- [ ] Validado byte a byte contra o Python original em cenários sintéticos e contra um SPED de produção real (que expôs e permitiu corrigir o bug do registro `0500`/`0900`) — mas a cobertura de casos reais ainda é pequena; vale ficar atento a outros arquivos que gerem erro no validador da Receita.
+
+## Auditoria — [[15 - Auditoria]]
+- [ ] Não há paginação de verdade (só um limite de 500 registros por consulta) — se o log crescer muito, avaliar cursor/paginação.
 
 ## Infraestrutura — [[10 - Infraestrutura e Deploy]]
 - [ ] Rotina de backup do volume do Postgres (`demandas-db-data`) — hoje os dados sobrevivem a reinício de container/VPS, mas não há backup externo configurado.

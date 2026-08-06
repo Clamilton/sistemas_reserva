@@ -8,15 +8,32 @@ tags: [sistema-demandas, notificações, websocket, técnico]
 
 ## O que existe
 
-Toda vez que uma demanda é **criada**, **movida** de coluna ou **finalizada**, o backend:
+Toda vez que uma demanda é **criada**, **movida** de coluna, **finalizada** ou **delegada**, o backend:
 1. Grava um registro em `Notification` (tipo, mensagem, data).
-2. Transmite esse evento **na hora**, via WebSocket (Socket.IO), pra **todos** os usuários com o site aberto (broadcast global).
+2. Transmite esse evento **na hora**, via WebSocket (Socket.IO), pra **todos** os usuários com o site aberto (broadcast global) — exceto `paused` e `delegated`, que são direcionadas.
 
-Exceção: a notificação de **motivo de pausa** (com o texto completo do motivo) não é broadcast — é **direcionada só pros usuários gestores**. Ver [[14 - Prioridade e Pausa com Gestor]] pro detalhe de como isso funciona (sala por usuário no Socket.IO).
+Exceções direcionadas (não são broadcast):
+- **Motivo de pausa** (com o texto completo do motivo) — só pros usuários **gestores**. Ver [[14 - Prioridade e Pausa com Gestor]].
+- **Delegação** (`delegated`) — só pro **novo operador** da demanda, quando ela é reatribuída (ver [[05 - Quadro Kanban e Cronômetro]]).
 
 Do lado do navegador, ao receber o evento:
 - aparece um **toast** com a mensagem;
-- o quadro Kanban e o sino de notificações são recarregados automaticamente (sem precisar dar F5).
+- o quadro Kanban e o sino de notificações são recarregados automaticamente (sem precisar dar F5);
+- se o evento é de demanda **criada**, o card entra piscando (ver seção abaixo) e, se a permissão foi concedida, dispara uma **notificação nativa do navegador**.
+
+## Notificação nativa do navegador (Chrome/etc.)
+
+Além do toast (que só é visto se a aba estiver aberta e em foco), o sistema pede permissão de `Notification` do navegador assim que o usuário loga, e dispara uma notificação do sistema operacional quando chega uma demanda nova **e a aba não está em foco** — se o usuário já está olhando o Kanban, o toast + o card piscando já bastam, sem duplicar aviso. Clicar na notificação foca a aba.
+
+Implementado só no lado do cliente (`src/lib/browserNotify.ts`) — não depende de nenhum serviço externo de push (não é web push de verdade, que funcionaria com a aba fechada; é a Notification API do navegador, que exige a aba estar aberta em algum lugar, só não necessariamente em foco).
+
+## Cards de demanda recém-criada piscam
+
+Cada demanda tem, no navegador, uma marca de "última vez que a aba esteve em foco" (`localStorage`, `src/lib/lastSeen.ts`). Uma demanda pisca (anel pulsante ao redor do card) quando `createdAt` é mais recente que essa marca — cobre dois casos:
+- **Tempo real**: chega um evento `created` via WebSocket enquanto a aba está aberta — o card novo aparece já piscando.
+- **Reabrir a aba**: o usuário estava ausente, volta pra aba (evento `visibilitychange`/`focus`), e qualquer demanda criada nesse intervalo pisca.
+
+Para de piscar quando o usuário abre o card (marca como "visto"). Ver `src/store/useAppStore.ts` (`novosIds`, `verificarNovasDemandas`, `marcarTaskVista`).
 
 ## Por que WebSocket (e não só recarregar de tempos em tempos)
 
@@ -44,4 +61,6 @@ Os eventos de criação/movimentação/finalização continuam **globais** — t
 - `server/src/socket.ts` — servidor Socket.IO, autenticação do handshake, `broadcastNotification()` (global) e `notifyUser()` (direcionada, sala `user:<id>`).
 - `server/src/routes/notifications.ts` — `pushNotification()` (global) e `pushNotificationToUsers()`/`notifyGestores()` (direcionadas).
 - `src/lib/socket.ts` — cliente (conecta/desconecta).
-- `src/App.tsx` — liga a conexão quando há usuário logado, ouve o evento `"notification"`.
+- `src/lib/browserNotify.ts` — pede permissão, dispara notificação nativa do navegador.
+- `src/lib/lastSeen.ts` — marca de "última vez em foco", base do piscar de cards novos.
+- `src/App.tsx` — liga a conexão quando há usuário logado, ouve o evento `"notification"`, ouve `visibilitychange`/`focus` pra recalcular cards novos.

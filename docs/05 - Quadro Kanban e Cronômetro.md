@@ -45,11 +45,30 @@ O card mostra o tempo trabalhado **ao vivo** (atualiza a cada segundo, via hook 
 
 Se o usuário abre o modal de finalização (arrastou pra "Concluído") e clica em **Cancelar**, a tarefa **volta pra coluna anterior** — isso gera uma nova entrada no histórico (a "ida e volta" fica registrada, é auditável), sem apagar nada.
 
+## Visibilidade e permissões
+
+O quadro mostra **todas as demandas de todos os operadores** — não existe mais filtro "só as minhas" (existiu numa fase intermediária; removido a pedido do usuário, ver [[12 - Histórico de Decisões]]). A partir daí, também foram abertos pra **qualquer usuário autenticado** (antes restritos a gestor):
+- **Criar** e **excluir** demandas.
+- **Delegar** — reatribuir o operador de uma demanda já existente pra outro usuário, direto nos detalhes da tarefa (antes só era possível escolher o operador na criação). Gera notificação direcionada (`delegated`) pro novo responsável e uma entrada em [[15 - Auditoria]].
+
+Continua restrito a gestor: mover uma tarefa já **Concluída** pra outra coluna (ver regra em [[14 - Prioridade e Pausa com Gestor]]) e a tela de [[15 - Auditoria]].
+
+## Filtros
+
+Barra de filtros (acima do quadro): busca por nome de empresa, responsável, prioridade, tipo (Compensação/Retificação) e um intervalo de datas — com uma opção **"Todos"** que limpa o intervalo e considera o histórico completo (sem essa opção marcada, o padrão exigiria escolher datas específicas).
+
+## Cards de demanda recém-criada piscam
+
+Um card entra em destaque (anel pulsante ao redor) quando a demanda foi criada depois da última vez que o usuário viu o quadro — cobre tanto quem está com a aba aberta em tempo real (chega uma demanda nova via WebSocket) quanto quem reabre a aba depois de ausente (compara contra o horário salvo em `localStorage` na última vez que a aba ficou em foco). Para de piscar quando o card é aberto. Detalhe completo em [[09 - Notificações em Tempo Real]].
+
 ## Onde está o código
 - `src/components/KanbanBoard.tsx` — orquestra o drag-and-drop (`@dnd-kit`), decide coluna/posição de destino, intercepta movimentos pra "Em Pausa" (abre [[14 - Prioridade e Pausa com Gestor|modal de motivo]]).
-- `src/components/Column.tsx` / `TaskCard.tsx` — visual das colunas e cards (com selo de prioridade e "Pausada").
+- `src/components/Column.tsx` / `TaskCard.tsx` — visual das colunas e cards (com selo de prioridade, "Pausada" e o anel de "recém-criada").
+- `src/components/NavFilterBar.tsx` — barra de filtros.
+- `src/components/TaskDetailsModal.tsx` — detalhes da tarefa, exclusão e delegação (select de operador).
 - `src/lib/time.ts` — `computeElapsedMs`, o cálculo de tempo por segmentos ativos.
-- `server/src/routes/tasks.ts` — lógica de mover, histórico, cronômetro, bloqueio (backend, fonte da verdade).
+- `src/lib/lastSeen.ts` — marca a última vez que a aba ficou em foco, usado pra decidir quais cards piscam.
+- `server/src/routes/tasks.ts` — lógica de mover, histórico, cronômetro, bloqueio, exclusão, delegação (backend, fonte da verdade).
 
 ## Limitação conhecida
 Não há atualização otimista: depois de soltar um card, ele "volta" visualmente até a resposta do servidor confirmar o movimento (rápido, mas não instantâneo). Movimentos de **outras pessoas** aparecem via o mecanismo de notificação em tempo real (ver [[09 - Notificações em Tempo Real]]).

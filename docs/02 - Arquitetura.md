@@ -46,7 +46,8 @@ Isso evita problema de CORS (front e API são "a mesma origem" do ponto de vista
 - **Zustand** pra estado global (duas stores principais: `useAuthStore` pro usuário logado, `useAppStore` pros dados do sistema — tarefas, colunas, empresas, operadores, notificações).
 - **@dnd-kit** pro drag-and-drop do quadro Kanban.
 - **Tailwind CSS v4** pro estilo.
-- Não guarda mais nada em `localStorage` — todo dado vem da API. Ver [[12 - Histórico de Decisões]] pra entender essa mudança.
+- Não guarda mais nada em `localStorage` — todo dado vem da API, com uma exceção pontual (`src/lib/lastSeen.ts`, só a marca de "última vez que a aba esteve em foco", usada pra decidir quais cards piscam — ver [[09 - Notificações em Tempo Real]]). Ver [[12 - Histórico de Decisões]] pra entender a mudança original.
+- `src/lib/sped/` e `src/lib/perdcomp/` — processamento de SPED e PER/DCOMP, **inteiramente no navegador** (o backend nunca vê esses arquivos). Ver [[16 - SPED Retificador]] e [[17 - Compensação via PER-DCOMP]].
 
 ### 2. Backend (Node.js + Express)
 - Rotas REST em `/api/*` (auth, users, empresas, tasks, notifications, columns).
