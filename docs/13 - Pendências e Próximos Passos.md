@@ -35,8 +35,8 @@ Lista do que é **sabidamente incompleto** hoje, organizada por nota relacionada
 - [ ] Reordenar/editar as colunas pela interface (hoje são fixas, definidas no seed do banco).
 
 ## Prioridade e Retificação — [[14 - Prioridade e Pausa com Gestor]] · [[06 - Criação de Demandas]]
+- [x] A checagem de bloqueio por prioridade era global (considerava todas as tarefas do sistema) — corrigida pra ser por operador, cada fila é independente.
 - [ ] O campo `retificacaoDetalhes` (como será feita a retificação) não é obrigatório hoje — avaliar se deveria ser.
-- [ ] A checagem de bloqueio por prioridade é global (considera todas as tarefas do sistema, não só as do operador). Confirmar se é o comportamento desejado pra equipes maiores.
 - [ ] Não há edição de colunas/etapas adicionais além de Baixa/Média/Alta — se precisar de mais granularidade, revisitar `PRIORITY_RANK`.
 
 ## Finalização — [[08 - Finalização e Mensagem Bitrix]]

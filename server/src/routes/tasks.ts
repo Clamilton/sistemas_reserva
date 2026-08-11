@@ -30,9 +30,11 @@ interface BlockingCandidate {
 }
 
 /**
- * Regra: pra iniciar uma tarefa, não pode haver outra tarefa não iniciada de
- * prioridade estritamente maior. Além disso, dentro do mesmo nível (exceto
- * "baixa"), a mais antiga tem que ser iniciada primeiro (FIFO por nível).
+ * Regra: pra iniciar uma tarefa, não pode haver outra tarefa do MESMO
+ * operador ainda não iniciada com prioridade estritamente maior. Além
+ * disso, dentro do mesmo nível (exceto "baixa"), a mais antiga tem que ser
+ * iniciada primeiro (FIFO por nível). A fila é por operador — a prioridade
+ * de uma demanda de outra pessoa nunca bloqueia a sua.
  */
 function findBlockingTask(
   candidates: BlockingCandidate[],
@@ -185,7 +187,7 @@ tasksRouter.patch("/:id/move", async (req, res) => {
 
   if (isStarting) {
     const others = await prisma.task.findMany({
-      where: { startedAt: null, id: { not: task.id } },
+      where: { startedAt: null, id: { not: task.id }, operadorId: task.operadorId },
       select: { id: true, empresaNome: true, prioridade: true, createdAt: true },
     });
     const blocker = findBlockingTask(others, task.prioridade, task.createdAt);

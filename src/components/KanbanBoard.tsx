@@ -104,7 +104,12 @@ export function KanbanBoard({ filters }: Props) {
   }, [columns, filteredTasks]);
 
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) ?? null : null;
-  const mostUrgent = useMemo(() => findMostUrgentPending(tasks), [tasks]);
+  // A fila de prioridade é por operador — a demanda mais urgente de outra
+  // pessoa não deve aparecer aqui nem bloquear quem tem uma fila diferente.
+  const mostUrgent = useMemo(
+    () => findMostUrgentPending(tasks.filter((t) => t.operadorId === currentUser?.id)),
+    [tasks, currentUser],
+  );
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string);
@@ -178,7 +183,7 @@ export function KanbanBoard({ filters }: Props) {
         <div className="mb-4 flex items-center gap-2 rounded-[16px] bg-accent-100 px-4 py-2.5 text-sm text-accent-800">
           <AlertTriangle size={16} className="shrink-0" />
           <span>
-            Prioridade {PRIORITY_LABEL[mostUrgent.prioridade]} mais antiga aguardando início:{" "}
+            Você tem uma demanda de prioridade {PRIORITY_LABEL[mostUrgent.prioridade]} aguardando início:{" "}
             <span className="font-semibold">{mostUrgent.empresa || "(sem empresa)"}</span> — criada
             em {formatDateTime(mostUrgent.createdAt)}
           </span>

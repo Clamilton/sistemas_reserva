@@ -116,3 +116,9 @@ Levou várias rodadas de ajuste depois da primeira versão funcionar:
 - Testado contra um PER/DCOMP real (não só dados sintéticos), o que expôs dois problemas de classificação de imposto no dicionário original (código `1082` mal rotulado, e várias entidades de "CP Terceiros" sem cobertura) — corrigidos priorizando o texto do PDF sobre o código quando o assunto é "CP ...", que agora vira uma única linha "INSS".
 
 Detalhe técnico completo, incluindo os bugs encontrados com o PDF real, em [[17 - Compensação via PER-DCOMP]].
+
+## 22. Fila de prioridade por operador, não global
+
+Reportado com um caso concreto: uma demanda **Alta** atribuída a outra pessoa (Espedito) bloqueava o usuário de iniciar sua própria demanda **Baixa**, mesmo os dois não tendo relação nenhuma. A checagem de bloqueio (item de [[14 - Prioridade e Pausa com Gestor]]) considerava todas as tarefas do sistema — já estava registrada como ponto em aberto em [[13 - Pendências e Próximos Passos]] antes desse relato confirmar que devia mesmo ser por operador.
+
+Corrigido filtrando a consulta de tarefas candidatas por `operadorId` — cada operador tem sua fila de prioridade independente das dos outros. O banner de "demanda mais urgente aguardando" no topo do Kanban tinha o mesmo problema (calculado sobre todas as tarefas) e recebeu o mesmo ajuste, senão mostraria um alerta que não bloqueia de verdade quem está vendo.
