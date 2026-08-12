@@ -41,6 +41,14 @@ Os dois casos abaixo têm a mesma causa raiz: a inserção de um registro novo p
 >
 > Corrigido expandindo o conjunto de saída pra cobrir todo registro que deve vir depois do F100 no leiaute oficial (F111 até F990). Na mesma revisão, identificado e corrigido preventivamente o mesmo padrão de bug nos blocos `M100`→`M110` e `M500`→`M510` (a inserção de um M100/M500 novo também só considerava M200/M600 como destino, ignorando M110/M510 como possíveis registros intermediários) — sem evidência de arquivo real que acionasse esse caso, mas a mesma causa raiz. Revalidado rodando `buildSped()` contra o SPED completo (35 mil linhas) que gerou o erro original.
 
+## Importação de recibos por competência (modo Múltiplos SPEDs)
+
+No modo de múltiplos SPEDs, cada arquivo precisa do recibo da escrituração anterior daquela competência — digitar um por um era repetitivo. O botão **"Importar recibos"** lê um arquivo de exportação (formato tab-separated: `ativo(true/false) · cnpj · dtIni(ISO) · dtFin(ISO) · dtTransmissao(ISO) · tipo · recibo-dígito`) e casa cada linha com o SPED anexado correspondente por **CNPJ + competência** (mês/ano de `DT_INI`), preenchendo o campo de recibo automaticamente.
+
+O recibo nesse arquivo de exportação vem com traço e dígito verificador (ex: `ABC...9-0`) — o campo `NUM_REC_ANTE` do SPED não aceita traço. `normalizarRecibo()` (já existente, usada também na digitação manual) remove esse e qualquer outro caractere não alfanumérico.
+
+Funciona em qualquer ordem: se os SPEDs já estavam anexados quando o arquivo de recibos é importado, os campos são preenchidos na hora; se são anexados depois, o mapeamento importado já fica disponível e é aplicado automaticamente a cada novo arquivo.
+
 ## Onde está o código
 - `src/components/SpedRetificador.tsx` — página (modo arquivo único e modo múltiplos SPEDs), carregada sob demanda (`React.lazy`) pra não inflar o bundle inicial do Kanban.
 - `src/lib/sped/*` — descrito acima.

@@ -12,6 +12,7 @@ import {
 import { info0000, info0140, lerSped, type Info0000, type Info0140, type SpedLeitura } from "../lib/sped/parser";
 import { buildSped } from "../lib/sped/gerador";
 import { baixarSpedUnico, baixarSpedsEmZip, normalizarRecibo } from "../lib/sped/io";
+import { onlyDigits } from "../lib/matchEmpresa";
 import { useToastStore } from "../store/useToastStore";
 
 const CONTAS_ANALITICAS = [
@@ -57,6 +58,27 @@ function formatarPeriodo(dtIni: string, dtFin: string): string {
   return `${f(dtIni)} → ${f(dtFin)}`;
 }
 
+function chaveRecibo(cnpj: string, dtIni: string): string {
+  return `${cnpj}|${dtIni}`;
+}
+
+/** Linha do arquivo de recibos por competência (exportação do e-CAC/PVA):
+ * ativo(true/false) \t cnpj \t dtIni(ISO) \t dtFin(ISO) \t dtTransmissao(ISO) \t tipo \t recibo[-dígito]
+ * O recibo sai com traço + dígito verificador (ex: "ABC...9-0") — o SPED não
+ * aceita traço no campo NUM_REC_ANTE, então normalizarRecibo() já remove. */
+function parseLinhaRecibos(linha: string): { cnpj: string; dtIni: string; recibo: string } | null {
+  const cols = linha.split("\t");
+  if (cols.length < 7) return null;
+  if (cols[0]?.trim().toLowerCase() === "false") return null;
+
+  const cnpj = onlyDigits(cols[1] ?? "");
+  const dtIni = isoParaDdmmaaaa((cols[2] ?? "").split("T")[0]);
+  const recibo = normalizarRecibo(cols[6] ?? "");
+  if (!cnpj || !dtIni || !recibo) return null;
+
+  return { cnpj, dtIni, recibo };
+}
+
 export function SpedRetificador() {
   const pushToast = useToastStore((s) => s.push);
   const [modoMulti, setModoMulti] = useState(false);
@@ -72,6 +94,7 @@ export function SpedRetificador() {
   const [variacaoPct, setVariacaoPct] = useState(VARIACAO_PADRAO.toString());
   const [tetoTrimestre, setTetoTrimestre] = useState("");
   const [inverterInicial, setInverterInicial] = useState(false);
+  const [recibosImportados, setRecibosImportados] = useState<Map<string, string>>(new Map());
 
   // Compartilhado
   const [credito, setCredito] = useState("");
@@ -83,6 +106,7 @@ export function SpedRetificador() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const filesInputRef = useRef<HTMLInputElement>(null);
+  const recibosInputRef = useRef<HTMLInputElement>(null);
 
   function addLog(msg: string, tag: LogEntry["tag"] = "") {
     setLog((prev) => [
@@ -179,7 +203,8 @@ export function SpedRetificador() {
         continue;
       }
 
-      novos.push({ file, leitura, info: info!, infoEst, recibo: info?.numRecAnte ?? "" });
+      const reciboImportado = recibosImportados.get(chaveRecibo(onlyDigits(infoEst?.cnpj ?? ""), dtIni));
+      novos.push({ file, leitura, info: info!, infoEst, recibo: info?.numRecAnte || reciboImportado || "" });
     }
 
     if (novos.length > 0) {
@@ -187,6 +212,49 @@ export function SpedRetificador() {
       setArquivos(combinados);
       addLog(`${novos.length} arquivo(s) anexado(s).`, "ok");
     }
+  }
+
+  // ── Modo múltiplos: importar arquivo de recibos por competência ──────────
+  async function handleImportarRecibos(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    const texto = await file.text();
+    const linhas = texto.split(/\r?\n/).filter((l) => l.trim().length > 0);
+
+    const mapa = new Map<string, string>();
+    let ignoradas = 0;
+    for (const linha of linhas) {
+      const parsed = parseLinhaRecibos(linha);
+      if (!parsed) {
+        ignoradas++;
+        continue;
+      }
+      mapa.set(chaveRecibo(parsed.cnpj, parsed.dtIni), parsed.recibo);
+    }
+
+    if (mapa.size === 0) {
+      pushToast("Nenhum recibo válido encontrado nesse arquivo.");
+      return;
+    }
+
+    setRecibosImportados((prev) => new Map([...prev, ...mapa]));
+
+    const arquivosAtualizados = arquivos.map((a) => {
+      const recibo = mapa.get(chaveRecibo(onlyDigits(a.infoEst?.cnpj ?? ""), a.info.dtIni));
+      return recibo && recibo !== a.recibo ? { ...a, recibo } : a;
+    });
+    const aplicados = arquivosAtualizados.filter((a, i) => a.recibo !== arquivos[i].recibo).length;
+    setArquivos(arquivosAtualizados);
+
+    addLog(
+      `Recibos importados: ${mapa.size} lido(s)` +
+        (aplicados > 0 ? `, ${aplicados} aplicado(s) aos arquivos já anexados` : "") +
+        (ignoradas > 0 ? `, ${ignoradas} linha(s) ignorada(s)` : "") +
+        ". Novos arquivos anexados depois também usam esse mapeamento automaticamente.",
+      "ok",
+    );
   }
 
   function removerArquivo(fileName: string) {
@@ -473,10 +541,27 @@ export function SpedRetificador() {
                   className="hidden"
                   onChange={handleAnexarArquivos}
                 />
-                <button onClick={() => filesInputRef.current?.click()} className="btn btn-secondary w-full">
-                  <Plus size={14} />
-                  Anexar arquivos SPED
-                </button>
+                <input
+                  ref={recibosInputRef}
+                  type="file"
+                  accept=".txt,.csv,.tsv"
+                  className="hidden"
+                  onChange={handleImportarRecibos}
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => filesInputRef.current?.click()} className="btn btn-secondary flex-1">
+                    <Plus size={14} />
+                    Anexar SPEDs
+                  </button>
+                  <button
+                    onClick={() => recibosInputRef.current?.click()}
+                    className="btn btn-secondary flex-1"
+                    title="Arquivo com o recibo de cada competência (CNPJ, período, recibo) — preenche o campo de recibo automaticamente"
+                  >
+                    <Upload size={14} />
+                    Importar recibos
+                  </button>
+                </div>
 
                 {arquivos.length === 0 ? (
                   <p className="mt-2 text-xs opacity-50">
