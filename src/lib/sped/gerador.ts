@@ -241,14 +241,33 @@ function recalcBlocos(outIn: string[], nl: string): string[] {
   return result;
 }
 
+// F100 é o primeiro filho de F010 no leiaute oficial (F010 > F100 > F111 >
+// F120 > F129 > F130 > F139 > F150 > F200 > ... > F990) — o conjunto
+// original só cobria F200 em diante como "saída do grupo", então um
+// arquivo com F111/F120/F129/F130/F139/F150 antes do F200/F990 fazia o
+// F100 ser inserido depois desses registros, quebrando a ordem (rejeitado
+// pelo validador da Receita). Mesmo bug existia no Python original.
 const F_SAIR_GRUPO = new Set([
   "F010",
+  "F111",
+  "F120",
+  "F129",
+  "F130",
+  "F139",
+  "F150",
   "F200",
+  "F205",
+  "F210",
+  "F211",
   "F500",
+  "F509",
   "F510",
+  "F519",
   "F525",
   "F550",
+  "F559",
   "F560",
+  "F569",
   "F600",
   "F700",
   "F800",
@@ -464,8 +483,11 @@ export function buildSped(params: BuildSpedParams): string[] {
       dentroF010Nosso = f.length > 2 && f[2] === cnpjEst;
     }
 
-    // ── M100/M105 antes M200 (ou M990 se bloco M vazio) ──────────────────
-    if ((r === "M200" || r === "M990") && !adicionouM100) {
+    // ── M100/M105 antes de M110 (se existir) ou M200 (ou M990 se bloco M
+    // vazio) — sem checar M110, um arquivo com registros de ajuste M110/
+    // M115 antes de M200 faria o M100 novo entrar depois deles, fora de
+    // ordem (mesma classe do bug de F100/F111-150 corrigido acima).
+    if ((r === "M110" || r === "M200" || r === "M990") && !adicionouM100) {
       if (inserirM100_101) {
         out.push(normaliza(linhaM100_101(), nl));
         out.push(normaliza(linhaM105_101(base), nl));
@@ -477,8 +499,9 @@ export function buildSped(params: BuildSpedParams): string[] {
       adicionouM100 = true;
     }
 
-    // ── M500/M505 antes M600 (mesmo fallback em M990) ────────────────────
-    if ((r === "M600" || r === "M990") && !adicionouM500) {
+    // ── M500/M505 antes de M510 (se existir) ou M600 (mesmo fallback em
+    // M990) — mesmo motivo do M110 acima.
+    if ((r === "M510" || r === "M600" || r === "M990") && !adicionouM500) {
       if (inserirM500_101) {
         out.push(normaliza(linhaM500_101(), nl));
         out.push(normaliza(linhaM505_101(base), nl));

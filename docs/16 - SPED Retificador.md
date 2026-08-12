@@ -27,12 +27,19 @@ O SPED contém dados fiscais sensíveis (CNPJ, valores, toda a escrituração da
 
 Antes de considerar a porta pronta: instalado `python3-tk` pra rodar o `sped_retificador.py` original diretamente, e comparado byte a byte contra a versão TypeScript — motor de cálculo, algoritmo de diferenciação entre meses (incluindo um cenário de estouro de teto trimestral) e uma geração completa de `buildSped()` simulando o round-trip pela File API. Todos os testes bateram idênticos.
 
-## Bug real encontrado depois, com um arquivo de produção
+## Bugs reais encontrados depois, com arquivos de produção
+
+Os dois casos abaixo têm a mesma causa raiz: a inserção de um registro novo procurava só por um conjunto **limitado** de "próximos registros possíveis" pra decidir onde entrar — quando o arquivo real tinha um registro intermediário fora desse conjunto (mas que, pela hierarquia oficial, precisa vir depois do registro novo), a inserção pulava esse registro e entrava fora de ordem.
 
 > [!bug] Registro `0500` inserido depois do `0900`, quebrando a hierarquia do bloco 0
 > O primeiro teste síntetico não incluía um registro `0900` (identificação de outras obrigações), então não pegou um defeito que também existia no Python original: o código inseria o novo `0500` (plano de contas) sempre "logo antes do `0990`" — sem checar se havia um `0900` no meio do caminho. Rodado contra um SPED real de produção, isso quebrou a ordem oficial (`...0500 → 0600 → 0900 → 0990`) e o validador da Receita rejeitou o arquivo ("esperado 0990, encontrado 0500").
 >
 > Corrigido inserindo o `0500` antes do primeiro entre `0600`/`0900`/`0990` (o que vier primeiro), no mesmo padrão que já era usado corretamente pra inserir o `0150` e os registros do bloco M. Revalidado com um SPED sintético reproduzindo a estrutura exata que expôs o problema.
+
+> [!bug] Registro `F100` inserido depois de `F120`, quebrando a hierarquia do bloco F
+> No leiaute oficial, `F100` é o **primeiro filho** de `F010`, antes de `F111`/`F120`/`F129`/`F130`/`F139`/`F150`. O código (também igual no Python original — o próprio comentário do código citava F111/F120/F150 como gatilho, mas o conjunto usado não os incluía) só reconhecia `F200` em diante como "saída do grupo F010". Um SPED real com registros `F120` (créditos de Ativo Imobilizado) antes do fechamento do bloco F fez o `F100` novo entrar **depois** desses registros — o PVA rejeitou o arquivo na importação.
+>
+> Corrigido expandindo o conjunto de saída pra cobrir todo registro que deve vir depois do F100 no leiaute oficial (F111 até F990). Na mesma revisão, identificado e corrigido preventivamente o mesmo padrão de bug nos blocos `M100`→`M110` e `M500`→`M510` (a inserção de um M100/M500 novo também só considerava M200/M600 como destino, ignorando M110/M510 como possíveis registros intermediários) — sem evidência de arquivo real que acionasse esse caso, mas a mesma causa raiz. Revalidado rodando `buildSped()` contra o SPED completo (35 mil linhas) que gerou o erro original.
 
 ## Onde está o código
 - `src/components/SpedRetificador.tsx` — página (modo arquivo único e modo múltiplos SPEDs), carregada sob demanda (`React.lazy`) pra não inflar o bundle inicial do Kanban.
