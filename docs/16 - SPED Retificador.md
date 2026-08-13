@@ -56,6 +56,10 @@ O recibo nesse arquivo de exportação vem com traço e dígito verificador (ex:
 
 Funciona em qualquer ordem: se os SPEDs já estavam anexados quando o arquivo de recibos é importado, os campos são preenchidos na hora; se são anexados depois, o mapeamento importado já fica disponível e é aplicado automaticamente a cada novo arquivo.
 
+## Tabela de prévia (modo Múltiplos SPEDs)
+
+A tabela de resultado no modo múltiplos (Arquivo, Período, Valor do Mês, Base, PIS, COFINS) tem cabeçalho fixo (`sticky top-0`, com fundo sólido) — a lista de arquivos rola por baixo do cabeçalho sem ele sumir, útil com muitos arquivos anexados de uma vez. A coluna Base usa o mesmo `calc.base` já calculado por arquivo (o mesmo valor exibido como "Base de Cálculo" no modo arquivo único).
+
 ## Processamento em Web Worker (evita travar a aba)
 
 Com arquivos grandes (na casa de dezenas de milhares de linhas, como os SPEDs reais usados nos testes dos bugs acima) e principalmente no modo múltiplos SPEDs, a leitura + geração rodando direto na thread principal travava a aba inteira até terminar — o navegador não conseguia nem repintar a tela.

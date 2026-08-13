@@ -725,12 +725,25 @@ export function SpedRetificador() {
                 <div className="max-h-64 overflow-y-auto rounded-[10px] border border-[color:var(--color-divider)]">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-[color:var(--color-divider)] text-left opacity-60">
-                        <th className="px-2 py-1.5 font-medium">Arquivo</th>
-                        <th className="px-2 py-1.5 font-medium">Período</th>
-                        <th className="px-2 py-1.5 text-right font-medium">Valor do Mês</th>
-                        <th className="px-2 py-1.5 text-right font-medium">PIS</th>
-                        <th className="px-2 py-1.5 text-right font-medium">COFINS</th>
+                      <tr className="text-left opacity-60">
+                        <th className="sticky top-0 border-b border-[color:var(--color-divider)] bg-[color:var(--color-surface)] px-2 py-1.5 font-medium">
+                          Arquivo
+                        </th>
+                        <th className="sticky top-0 border-b border-[color:var(--color-divider)] bg-[color:var(--color-surface)] px-2 py-1.5 font-medium">
+                          Período
+                        </th>
+                        <th className="sticky top-0 border-b border-[color:var(--color-divider)] bg-[color:var(--color-surface)] px-2 py-1.5 text-right font-medium">
+                          Valor do Mês
+                        </th>
+                        <th className="sticky top-0 border-b border-[color:var(--color-divider)] bg-[color:var(--color-surface)] px-2 py-1.5 text-right font-medium">
+                          Base
+                        </th>
+                        <th className="sticky top-0 border-b border-[color:var(--color-divider)] bg-[color:var(--color-surface)] px-2 py-1.5 text-right font-medium">
+                          PIS
+                        </th>
+                        <th className="sticky top-0 border-b border-[color:var(--color-divider)] bg-[color:var(--color-surface)] px-2 py-1.5 text-right font-medium">
+                          COFINS
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -739,6 +752,7 @@ export function SpedRetificador() {
                           <td className="truncate px-2 py-1.5">{p.item.file.name}</td>
                           <td className="px-2 py-1.5">{formatarPeriodo(p.item.info.dtIni, p.item.info.dtFin)}</td>
                           <td className="px-2 py-1.5 text-right">{fmtBr(p.valorMes)}</td>
+                          <td className="px-2 py-1.5 text-right">{fmtBr(p.calc.base)}</td>
                           <td className="px-2 py-1.5 text-right">{fmtBr(p.calc.valorPis)}</td>
                           <td className="px-2 py-1.5 text-right">{fmtBr(p.calc.valorCofins)}</td>
                         </tr>

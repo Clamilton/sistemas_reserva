@@ -150,3 +150,15 @@ Validado ao vivo no navegador contra os mesmos arquivos reais que expuseram os b
 Reportado: clicar no campo não mostrava nenhuma opção pra selecionar. Causa raiz encontrada por inspeção do código, não do DOM em si (dropdown nativo de `<datalist>` não é capturável por screenshot de automação de navegador) — o valor padrão pré-preenchido no campo ("LANCAMENTO DE CREDITO EXTEMPORANEO ACORDAO 9303009893") não é nenhuma das 8 opções cadastradas, e o navegador filtra as sugestões do `<datalist>` pelo texto já presente no campo. Sem nenhuma opção batendo com esse texto, o resultado é sempre zero sugestões — o dropdown "não fazia nada" porque não tinha o que mostrar, não por estar quebrado.
 
 Corrigido limpando o campo ao focar (revela as 8 opções) e restaurando o valor anterior ao perder o foco sem escolha, pra não afetar quem nunca mexe nesse campo. Detalhe técnico completo em [[16 - SPED Retificador]].
+
+## 27. Fila de prioridade por operador: confirmado que vale também pra gestor
+
+Reportado "de novo" um bloqueio de prioridade parecendo o bug do item 22 — usuário bloqueado tentando iniciar uma demanda, citando uma demanda Alta que "não é minha". Investigado direto na API (reproduzido a chamada de `PATCH /:id/move` manualmente): não era regressão do fix do item 22. O usuário (gestor) estava movendo o card de **outro operador**, e tanto a demanda sendo iniciada quanto a demanda Alta bloqueadora eram desse mesmo outro operador — ou seja, a fila por operador estava correta, só que aplicada à fila de quem é dono do card, não à do gestor que arrasta.
+
+Perguntado diretamente: gestor deveria conseguir pular a ordem de prioridade de outro operador? Resposta: não, deve continuar bloqueando — mesmo um gestor não deve conseguir iniciar a demanda Baixa de alguém enquanto a Alta dessa mesma pessoa está esperando. Nenhuma mudança de código; documentado aqui pra não reabrir a investigação à toa numa próxima vez que alguém relatar algo parecido.
+
+## 28. SPED Retificador: tabela de prévia (múltiplos) sem Base + cabeçalho fixo
+
+Reportado que a coluna Base de Cálculo estava faltando na tabela de prévia do modo múltiplos (só tinha Valor do Mês/PIS/COFINS — o modo arquivo único já mostrava Base, só não estava replicado na tabela). Pedido também pra fixar o cabeçalho da tabela, já que ela rola verticalmente (`max-h-64 overflow-y-auto`) quando tem muitos arquivos anexados.
+
+Adicionada a coluna Base (usa o mesmo `calc.base` que já era calculado por arquivo, só não estava sendo renderizado) e cabeçalho `sticky top-0` com fundo sólido. Validado ao vivo anexando os 2 arquivos reais de PIS/COFINS usados nos testes anteriores (viraram 9 competências) — Base aparece com valor correto em cada linha, e o cabeçalho fica fixo durante o scroll.
