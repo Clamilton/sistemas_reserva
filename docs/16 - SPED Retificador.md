@@ -21,7 +21,9 @@ O SPED contém dados fiscais sensíveis (CNPJ, valores, toda a escrituração da
 - `calculo.ts` — motor de cálculo com `decimal.js` (nunca `number` puro, pra não introduzir erro de ponto flutuante em valor fiscal): distribuição do crédito entre base/PIS/COFINS, e o algoritmo de diferenciação de crédito entre múltiplos meses/SPEDs (alterna um padrão "baixo/alto" de variação percentual, com o último mês absorvendo o resíduo do arredondamento).
 - `parser.ts` — leitura do arquivo via File API do navegador: detecção de encoding na mesma ordem do Python (`utf-8-sig` → `utf-8` → `cp1252` → `latin-1`), separação do texto da assinatura digital binária que a Receita anexa depois do `|9999|` (preservada intacta e reescrita sem modificação), funções de busca de registro (`info0000`, `contaExiste`, `participanteExiste`, `acharM100`, etc.).
 - `gerador.ts` — os geradores de cada linha nova e a função principal `buildSped()`, que percorre o arquivo original e insere os registros novos respeitando a hierarquia oficial do bloco 0 (`0000, 0001, 0002, 0100, 0110, 0111, 0120, 0140, 0145, 0150, 0190, 0200, 0205, 0206, 0208, 0300, 0400, 0450, 0500, 0600, 0900, 0990`) e do bloco M/1.
-- `io.ts` — reescreve o texto de volta pro encoding original, dispara o download, e empacota várias retificadoras num `.zip` (modo multi-SPED) via `fflate`.
+- `encode.ts` — funções puras (sem `document`/`Blob`/nenhuma API de DOM): reescreve o texto de volta pro encoding original (`montarArquivoSped`) e normaliza recibo (`normalizarRecibo`). Separado de `io.ts` justamente por ser "sem DOM" — é o que permite esse código rodar dentro do Web Worker (ver seção abaixo).
+- `io.ts` — só o que precisa do navegador: dispara o download de um `Blob`/`Uint8Array` (`downloadBlob`, `baixarBytes`).
+- `spedWorkerProtocol.ts`, `spedWorker.ts`, `useSpedWorker.ts` — o Web Worker e sua API, ver seção abaixo.
 
 ## Validação contra o Python original
 
@@ -48,6 +50,23 @@ No modo de múltiplos SPEDs, cada arquivo precisa do recibo da escrituração an
 O recibo nesse arquivo de exportação vem com traço e dígito verificador (ex: `ABC...9-0`) — o campo `NUM_REC_ANTE` do SPED não aceita traço. `normalizarRecibo()` (já existente, usada também na digitação manual) remove esse e qualquer outro caractere não alfanumérico.
 
 Funciona em qualquer ordem: se os SPEDs já estavam anexados quando o arquivo de recibos é importado, os campos são preenchidos na hora; se são anexados depois, o mapeamento importado já fica disponível e é aplicado automaticamente a cada novo arquivo.
+
+## Processamento em Web Worker (evita travar a aba)
+
+Com arquivos grandes (na casa de dezenas de milhares de linhas, como os SPEDs reais usados nos testes dos bugs acima) e principalmente no modo múltiplos SPEDs, a leitura + geração rodando direto na thread principal travava a aba inteira até terminar — o navegador não conseguia nem repintar a tela.
+
+A pergunta natural seria mandar esse processamento pro backend, mas isso contradiria a [[#Decisão de arquitetura: tudo no navegador, nada no servidor|decisão de arquitetura]] logo acima: o SPED tem dado fiscal sensível e o servidor não pode vê-lo. A solução que resolve as duas coisas ao mesmo tempo é um **Web Worker**: uma thread separada dentro do próprio navegador — o arquivo continua nunca saindo da máquina do usuário, só passa a rodar numa thread que não é a que desenha a tela.
+
+- `spedWorker.ts` é o worker propriamente dito: mantém um cache em memória das leituras já feitas (indexado pelo nome do arquivo), e responde a 4 tipos de mensagem — `ler`, `remover`, `gerarUnico`, `gerarMulti` (esse último manda uma mensagem de progresso a cada arquivo concluído, pra popular o log da UI incrementalmente). Só devolve pra thread principal o resumo necessário pra exibir (cabeçalho do SPED, contagem de linhas) na leitura, e os bytes finais já prontos na geração — nunca o array de linhas inteiro ida e volta.
+- `useSpedWorker.ts` é o hook React que cria o worker (uma vez, no mount de `SpedRetificador.tsx`) e expõe uma API baseada em `Promise` (`ler`/`remover`/`gerarUnico`/`gerarMulti`) por cima do protocolo de mensagens — o componente não lida com `postMessage`/`onmessage` diretamente.
+- `spedWorkerProtocol.ts` só declara os tipos das mensagens (`type`-only), compartilhado pelos dois lados.
+
+> [!bug] `lib` do TypeScript incompatível entre app e worker
+> O código do app usa `lib: ["DOM", ...]` (tem `window`, `document` etc.) e o worker precisa de `lib: ["WebWorker", ...]` — as duas declaram um `self` global com assinatura de `postMessage` diferente, então não dá pra compilar os dois juntos num único `tsc`. Resolvido com um `tsconfig.worker.json` próprio (referenciado em `tsconfig.json`, excluído de `tsconfig.app.json`) — cada um vira um programa TS isolado, sem contaminação cruzada dos globais.
+
+Valores `Decimal` (de `decimal.js`) não atravessam a fronteira do worker de forma segura via `postMessage` (structured clone não sabe serializar a instância) — por isso o crédito é passado como string (`.toString()`) e reconstruído (`new Decimal(str)`) do outro lado. Os bytes finais do SPED (e do `.zip`, no modo múltiplos) atravessam de volta como `Uint8Array` transferível (`Transferable`), sem custo de cópia.
+
+Testado ao vivo no navegador contra os mesmos SPEDs reais de ~2,6MB/35 mil linhas que expuseram os bugs de hierarquia — nos dois modos, leitura e geração completam em poucos segundos e a aba permanece responsiva durante o processamento pesado.
 
 ## Onde está o código
 - `src/components/SpedRetificador.tsx` — página (modo arquivo único e modo múltiplos SPEDs), carregada sob demanda (`React.lazy`) pra não inflar o bundle inicial do Kanban.

@@ -9,9 +9,10 @@ import {
   parseDecimalBR,
   type CalculoResultado,
 } from "../lib/sped/calculo";
-import { info0000, info0140, lerSped, type Info0000, type Info0140, type SpedLeitura } from "../lib/sped/parser";
-import { buildSped } from "../lib/sped/gerador";
-import { baixarSpedUnico, baixarSpedsEmZip, normalizarRecibo } from "../lib/sped/io";
+import type { Info0000, Info0140 } from "../lib/sped/parser";
+import { normalizarRecibo } from "../lib/sped/encode";
+import { baixarBytes } from "../lib/sped/io";
+import { useSpedWorker } from "../lib/sped/useSpedWorker";
 import { onlyDigits } from "../lib/matchEmpresa";
 import { useToastStore } from "../store/useToastStore";
 
@@ -35,9 +36,9 @@ interface LogEntry {
 
 interface ArquivoAnexado {
   file: File;
-  leitura: SpedLeitura;
   info: Info0000;
   infoEst: Info0140 | null;
+  totalLinhas: number;
   recibo: string;
 }
 
@@ -81,11 +82,12 @@ function parseLinhaRecibos(linha: string): { cnpj: string; dtIni: string; recibo
 
 export function SpedRetificador() {
   const pushToast = useToastStore((s) => s.push);
+  const worker = useSpedWorker();
   const [modoMulti, setModoMulti] = useState(false);
   const [log, setLog] = useState<LogEntry[]>([]);
 
   // Modo simples
-  const [arquivo, setArquivo] = useState<{ file: File; leitura: SpedLeitura; info: Info0000; infoEst: Info0140 | null } | null>(null);
+  const [arquivo, setArquivo] = useState<{ file: File; info: Info0000; infoEst: Info0140 | null; totalLinhas: number } | null>(null);
   const [recibo, setRecibo] = useState("");
   const [dtOper, setDtOper] = useState("");
 
@@ -124,30 +126,25 @@ export function SpedRetificador() {
   }
   const previewSingle: CalculoResultado | null = creditoDecimal ? calcular(creditoDecimal) : null;
 
-  // ── Modo simples: carregar arquivo ──────────────────────────────────────
+  // ── Modo simples: carregar arquivo (leitura roda no Web Worker) ──────────
   async function handleSelectFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
 
+    if (arquivo) worker.remover(arquivo.file.name);
+
     try {
-      const leitura = await lerSped(file);
-      const info = info0000(leitura.lines);
-      if (!info) {
-        pushToast("Registro 0000 não encontrado — não parece um SPED EFD-Contribuições válido.");
-        return;
-      }
-      const infoEst = info0140(leitura.lines);
-      setArquivo({ file, leitura, info, infoEst });
+      const { info, infoEst, totalLinhas, qtd0140 } = await worker.ler(file.name, file);
+      setArquivo({ file, info, infoEst, totalLinhas });
 
       if (info.dtIni && !dtOper) setDtOper(info.dtIni);
       if (info.numRecAnte && !recibo) setRecibo(info.numRecAnte);
 
-      const n0140 = leitura.lines.filter((l) => l.startsWith("|0140|")).length;
-      addLog(`Arquivo carregado: ${file.name} (${leitura.lines.length.toLocaleString("pt-BR")} linhas)`, "ok");
-      if (n0140 > 1) {
+      addLog(`Arquivo carregado: ${file.name} (${totalLinhas.toLocaleString("pt-BR")} linhas)`, "ok");
+      if (qtd0140 > 1) {
         addLog(
-          `AVISO: arquivo tem ${n0140} estabelecimentos (registros 0140). Sempre é usado o CNPJ do PRIMEIRO — confira se é o correto.`,
+          `AVISO: arquivo tem ${qtd0140} estabelecimentos (registros 0140). Sempre é usado o CNPJ do PRIMEIRO — confira se é o correto.`,
           "err",
         );
       }
@@ -156,7 +153,7 @@ export function SpedRetificador() {
     }
   }
 
-  // ── Modo múltiplos: anexar arquivos ─────────────────────────────────────
+  // ── Modo múltiplos: anexar arquivos (leitura roda no Web Worker) ─────────
   async function handleAnexarArquivos(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
@@ -167,20 +164,20 @@ export function SpedRetificador() {
 
     for (const file of files) {
       if (jaAnexados.has(file.name)) continue;
-      let leitura: SpedLeitura;
+
+      let lido: Awaited<ReturnType<typeof worker.ler>>;
       try {
-        leitura = await lerSped(file);
+        lido = await worker.ler(file.name, file);
       } catch (err) {
         pushToast(`${file.name}: ${err instanceof Error ? err.message : "erro ao ler"}`);
         continue;
       }
-
-      const info = info0000(leitura.lines);
-      const infoEst = info0140(leitura.lines);
-      const dtIni = info?.dtIni ?? "";
+      const { info, infoEst, totalLinhas } = lido;
+      const dtIni = info.dtIni;
 
       if (dtIni.length !== 8 || !/^\d+$/.test(dtIni)) {
         pushToast(`${file.name}: registro 0000 sem DT_INI válida — não dá pra saber a competência.`);
+        worker.remover(file.name);
         continue;
       }
 
@@ -192,6 +189,7 @@ export function SpedRetificador() {
           pushToast(
             `${file.name}: CNPJ (${cnpjAtual || "vazio"}) diverge dos demais arquivos anexados (${cnpjRef}).`,
           );
+          worker.remover(file.name);
           continue;
         }
       }
@@ -200,11 +198,12 @@ export function SpedRetificador() {
         pushToast(
           `${file.name}: já existe um arquivo anexado com a mesma competência (${dtIni.slice(0, 2)}/${dtIni.slice(2, 4)}/${dtIni.slice(4)}).`,
         );
+        worker.remover(file.name);
         continue;
       }
 
-      const reciboImportado = recibosImportados.get(chaveRecibo(onlyDigits(infoEst?.cnpj ?? ""), dtIni));
-      novos.push({ file, leitura, info: info!, infoEst, recibo: info?.numRecAnte || reciboImportado || "" });
+      const reciboImportado = recibosImportados.get(chaveRecibo(onlyDigits(cnpjAtual), dtIni));
+      novos.push({ file, info, infoEst, totalLinhas, recibo: info.numRecAnte || reciboImportado || "" });
     }
 
     if (novos.length > 0) {
@@ -258,6 +257,7 @@ export function SpedRetificador() {
   }
 
   function removerArquivo(fileName: string) {
+    worker.remover(fileName);
     setArquivos((prev) => prev.filter((a) => a.file.name !== fileName));
   }
 
@@ -340,21 +340,24 @@ export function SpedRetificador() {
       addLog(`Valor PIS     : R$ ${fmtBr(vals.valorPis)}`);
       addLog(`Valor COFINS  : R$ ${fmtBr(vals.valorCofins)}`);
 
-      const novas = buildSped({
-        lines: arquivo.leitura.lines,
-        recibo: reciboNorm,
-        dtOper: dtRaw,
-        vals,
-        codPart: codPart.trim() || "001",
-        codCta: codCta.trim() || "001",
-        nomeCta: nomeCta.trim(),
-        descOper: descOper.trim(),
-        nl: arquivo.leitura.nl,
-      });
-
       const baseNome = arquivo.file.name.replace(/\.[^.]+$/, "");
-      baixarSpedUnico(novas, arquivo.leitura.encoding, arquivo.leitura.sig, `${baseNome}_retificadora.txt`);
-      addLog(`Arquivo gerado: ${baseNome}_retificadora.txt (${novas.length.toLocaleString("pt-BR")} linhas)`, "ok");
+      const filename = `${baseNome}_retificadora.txt`;
+      const resultado = await worker.gerarUnico(
+        arquivo.file.name,
+        {
+          recibo: reciboNorm,
+          dtOper: dtRaw,
+          creditoStr: creditoDecimal.toString(),
+          codPart: codPart.trim() || "001",
+          codCta: codCta.trim() || "001",
+          nomeCta: nomeCta.trim(),
+          descOper: descOper.trim(),
+        },
+        filename,
+      );
+
+      baixarBytes(resultado.bytes, resultado.filename);
+      addLog(`Arquivo gerado: ${resultado.filename} (${resultado.totalLinhas.toLocaleString("pt-BR")} linhas)`, "ok");
       pushToast("SPED Retificadora gerada.");
     } catch (err) {
       addLog(`ERRO: ${err instanceof Error ? err.message : String(err)}`, "err");
@@ -421,52 +424,53 @@ export function SpedRetificador() {
     addLog(`Diferenciação de crédito — ${arquivos.length} arquivo(s)`);
     addLog(`Crédito Total : R$ ${fmtBr(creditoDecimal)}   |   Variação: ${fmtBr(variacao)}%`);
 
-    const zipEntradas: { filename: string; linhas: string[]; encoding: string; sig: Uint8Array }[] = [];
-    let falhas = 0;
-
-    for (let i = 0; i < arquivos.length; i++) {
-      const item = arquivos[i];
-      const valorMes = resultado.valores[i];
-      try {
-        const vals = calcular(valorMes);
-        const dtIni = item.info.dtIni;
-        const novas = buildSped({
-          lines: item.leitura.lines,
+    const itens = arquivos.map((item, i) => {
+      const dtIni = item.info.dtIni;
+      const baseNome = item.file.name.replace(/\.[^.]+$/, "");
+      const competencia = `${dtIni.slice(2, 4)}-${dtIni.slice(4)}`;
+      const filename = `${baseNome}_${competencia}_retificadora.txt`;
+      return {
+        id: item.file.name,
+        filename,
+        params: {
           recibo: recibos.get(item.file.name)!,
           dtOper: dtIni,
-          vals,
+          creditoStr: resultado.valores[i].toString(),
           codPart: codPart.trim() || "001",
           codCta: codCta.trim() || "001",
           nomeCta: nomeCta.trim(),
           descOper: descOper.trim(),
-          nl: item.leitura.nl,
-        });
-        const baseNome = item.file.name.replace(/\.[^.]+$/, "");
-        const competencia = `${dtIni.slice(2, 4)}-${dtIni.slice(4)}`;
-        const filename = `${baseNome}_${competencia}_retificadora.txt`;
-        zipEntradas.push({ filename, linhas: novas, encoding: item.leitura.encoding, sig: item.leitura.sig });
-        addLog(`✔ ${item.file.name} → R$ ${fmtBr(valorMes)} → ${filename}`, "ok");
-      } catch (err) {
-        falhas++;
-        addLog(`✘ ${item.file.name}: ERRO — ${err instanceof Error ? err.message : String(err)}`, "err");
+        },
+      };
+    });
+
+    try {
+      const resultadoZip = await worker.gerarMulti(itens, "sped_retificadoras.zip", (p) => {
+        if (p.ok) {
+          addLog(`✔ ${itens[p.index].id} → ${p.filename} (${p.totalLinhas.toLocaleString("pt-BR")} linhas)`, "ok");
+        } else {
+          addLog(`✘ ${p.nomeOriginal}: ERRO — ${p.error}`, "err");
+        }
+      });
+
+      const soma = resultado.valores.reduce((a, b) => a.plus(b), new Decimal(0));
+      addLog(
+        `Soma dos meses: R$ ${fmtBr(soma)} (crédito total: R$ ${fmtBr(creditoDecimal)})`,
+        soma.minus(creditoDecimal).abs().lt("0.01") ? "ok" : "err",
+      );
+
+      baixarBytes(resultadoZip.bytes, resultadoZip.filename, "application/zip");
+
+      if (resultadoZip.falhas > 0) {
+        pushToast(`${resultadoZip.sucesso} de ${arquivos.length} retificadoras geradas — ${resultadoZip.falhas} falharam.`);
+      } else {
+        pushToast(`${resultadoZip.sucesso} SPED Retificadoras geradas em ${resultadoZip.filename}`);
       }
-    }
-
-    const soma = resultado.valores.reduce((a, b) => a.plus(b), new Decimal(0));
-    addLog(
-      `Soma dos meses: R$ ${fmtBr(soma)} (crédito total: R$ ${fmtBr(creditoDecimal)})`,
-      soma.minus(creditoDecimal).abs().lt("0.01") ? "ok" : "err",
-    );
-
-    if (zipEntradas.length > 0) {
-      baixarSpedsEmZip(zipEntradas, "sped_retificadoras.zip");
-    }
-
-    setGerando(false);
-    if (falhas > 0) {
-      pushToast(`${zipEntradas.length} de ${arquivos.length} retificadoras geradas — ${falhas} falharam.`);
-    } else {
-      pushToast(`${zipEntradas.length} SPED Retificadoras geradas em sped_retificadoras.zip`);
+    } catch (err) {
+      addLog(`ERRO: ${err instanceof Error ? err.message : String(err)}`, "err");
+      pushToast(err instanceof Error ? err.message : "Erro ao gerar as retificadoras.");
+    } finally {
+      setGerando(false);
     }
   }
 
@@ -527,7 +531,7 @@ export function SpedRetificador() {
                       CNPJ: {arquivo.info.cnpj} &nbsp; UF: {arquivo.info.uf} &nbsp; Layout: {arquivo.info.codVer}
                     </p>
                     <p className="opacity-70">Período: {formatarPeriodo(arquivo.info.dtIni, arquivo.info.dtFin)}</p>
-                    <p className="opacity-50">{arquivo.file.name} — {arquivo.leitura.lines.length.toLocaleString("pt-BR")} linhas</p>
+                    <p className="opacity-50">{arquivo.file.name} — {arquivo.totalLinhas.toLocaleString("pt-BR")} linhas</p>
                   </div>
                 )}
               </>
