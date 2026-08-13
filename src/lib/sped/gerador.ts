@@ -52,30 +52,32 @@ export function linhaF100(
 
 // M100 / M105 (PIS)
 
-/** M100 tipo 101 — Aquisição de Bens para Revenda (mesmo código do crédito
- * normal do contribuinte; o crédito extemporâneo entra no mesmo grupo). */
-export function linhaM100_101(base: Decimal, vlPis: Decimal): string {
+/** M100 — crédito extemporâneo, no código (`101` — Aquisição de Bens para
+ * Revenda, ou `201` — vinculado a receita não tributada) que já refletir
+ * o regime do contribuinte pra essa competência. */
+export function linhaM100(codCred: string, base: Decimal, vlPis: Decimal): string {
   const b = fmtSped(base);
   const vp = fmtSped(vlPis);
-  return `|M100|101|0|${b}|${fmtAliq(ALIQ_PIS)}|||${vp}|0|0|0|${vp}|1|0|${vp}|\n`;
+  return `|M100|${codCred}|0|${b}|${fmtAliq(ALIQ_PIS)}|||${vp}|0|0|0|${vp}|1|0|${vp}|\n`;
 }
 
-/** M105 do M100|101 — detalhamento com natureza 13 (outras operações com
- * direito a crédito) e CST 53, todo o valor da base alocado. */
-export function linhaM105_101(base: Decimal): string {
+/** M105 — detalhamento com natureza 13 (outras operações com direito a
+ * crédito) e CST 53, todo o valor da base alocado. Mesmo conteúdo
+ * independente do código do M100 pai (o COD_CRED não aparece no M105). */
+export function linhaM105(base: Decimal): string {
   const b = fmtSped(base);
   return `|M105|13|53|${b}|0|${b}|${b}|||RECUPERACAO DE CREDITOS TRIBUTARIOS|\n`;
 }
 
 // M500 / M505 (COFINS)
 
-export function linhaM500_101(base: Decimal, vlCofins: Decimal): string {
+export function linhaM500(codCred: string, base: Decimal, vlCofins: Decimal): string {
   const b = fmtSped(base);
   const vc = fmtSped(vlCofins);
-  return `|M500|101|0|${b}|${fmtAliq(ALIQ_COFINS)}|||${vc}|0|0|0|${vc}|1|0|${vc}|\n`;
+  return `|M500|${codCred}|0|${b}|${fmtAliq(ALIQ_COFINS)}|||${vc}|0|0|0|${vc}|1|0|${vc}|\n`;
 }
 
-export function linhaM505_101(base: Decimal): string {
+export function linhaM505(base: Decimal): string {
   const b = fmtSped(base);
   return `|M505|13|53|${b}|0|${b}|${b}|||RECUPERACAO DE CREDITOS TRIBUTARIOS|\n`;
 }
@@ -295,16 +297,18 @@ export function buildSped(params: BuildSpedParams): string[] {
   const inserirApos = new Map<number, string[]>();
   const inserirAntes = new Map<number, string[]>();
 
-  // O crédito extemporâneo entra no MESMO grupo do crédito normal do
-  // contribuinte (COD_CRED 101 — Aquisição de Bens para Revenda), como
-  // mais um detalhamento M105/M505 de natureza 13 (outras operações com
-  // direito a crédito) e CST 53. Confirmado direto no validador da
-  // Receita: tentativas anteriores de isolar isso num COD_CRED 201
-  // separado, ou de nunca tocar num M100|101 real, foram rejeitadas
-  // ("não deverá existir") — o correto é somar no 101 existente (base e
-  // crédito no próprio M100/M500, e o valor no M105/M505). Se não existir
-  // nenhum M100|101/M500|101 com a alíquota padrão, cria o par completo.
-  // Ver [[16 - SPED Retificador]] no repositório de docs.
+  // O crédito extemporâneo entra no MESMO grupo (COD_CRED) que o crédito
+  // "normal" do contribuinte já usa — como mais um detalhamento M105/M505
+  // de natureza 13 (outras operações com direito a crédito) e CST 53.
+  // Confirmado direto no validador da Receita, em duas empresas
+  // diferentes: quando já existe um M100|101 real (crédito vinculado a
+  // receita tributada — o caso mais comum), o novo M105/M505 tem que
+  // entrar nesse MESMO grupo, com base e crédito somados também no
+  // próprio M100/M500 pai (não só no filho). Só cria um par novo se não
+  // existir NENHUM M100/M500 (nem 101 nem 201) com a alíquota padrão —
+  // nesse caso usa 201 (crédito vinculado a receita não tributada), pra
+  // ficar consistente com o Bloco 1 (1100/1500 logo abaixo), que sempre
+  // usa 201. Ver [[16 - SPED Retificador]] no repositório de docs.
   const plano: [string, Decimal][] = [
     ["M100", vlPis],
     ["M500", vlCofins],
@@ -317,7 +321,9 @@ export function buildSped(params: BuildSpedParams): string[] {
 
   for (const [regPai, vlCred] of plano) {
     const regFilho = regPai === "M100" ? "M105" : "M505";
-    const idxPai = acharM100(lines, regPai, "101", aliqEsperadaPorReg[regPai]);
+    const idxPai =
+      acharM100(lines, regPai, "101", aliqEsperadaPorReg[regPai]) ??
+      acharM100(lines, regPai, "201", aliqEsperadaPorReg[regPai]);
 
     if (idxPai === null) {
       if (regPai === "M100") inserirM100 = true;
@@ -332,7 +338,7 @@ export function buildSped(params: BuildSpedParams): string[] {
       substituir.set(idxFilho, somarM105(lines[idxFilho], base, base, nl));
     } else {
       const idxApos = fimGrupoM100(lines, idxPai, regFilho);
-      const nova = regPai === "M100" ? linhaM105_101(base) : linhaM505_101(base);
+      const nova = regPai === "M100" ? linhaM105(base) : linhaM505(base);
       const arr = inserirApos.get(idxApos) ?? [];
       arr.push(normaliza(nova, nl));
       inserirApos.set(idxApos, arr);
@@ -457,8 +463,8 @@ export function buildSped(params: BuildSpedParams): string[] {
     // ordem (mesma classe do bug de F100/F111-150 corrigido acima).
     if ((r === "M110" || r === "M200" || r === "M990") && !adicionouM100) {
       if (inserirM100) {
-        out.push(normaliza(linhaM100_101(base, vlPis), nl));
-        out.push(normaliza(linhaM105_101(base), nl));
+        out.push(normaliza(linhaM100("201", base, vlPis), nl));
+        out.push(normaliza(linhaM105(base), nl));
       }
       adicionouM100 = true;
     }
@@ -467,8 +473,8 @@ export function buildSped(params: BuildSpedParams): string[] {
     // M990) — mesmo motivo do M110 acima.
     if ((r === "M510" || r === "M600" || r === "M990") && !adicionouM500) {
       if (inserirM500) {
-        out.push(normaliza(linhaM500_101(base, vlCofins), nl));
-        out.push(normaliza(linhaM505_101(base), nl));
+        out.push(normaliza(linhaM500("201", base, vlCofins), nl));
+        out.push(normaliza(linhaM505(base), nl));
       }
       adicionouM500 = true;
     }
