@@ -256,19 +256,33 @@ export interface Info0140 {
   codMun: string;
 }
 
-/** Retorna dados do estabelecimento (registro 0140). */
+/** CNPJ da matriz: os 12 dígitos antes do DV (raiz + ordem) terminam em 0001. */
+function ehMatriz(cnpj: string): boolean {
+  return cnpj.length === 14 && cnpj.slice(0, 12).endsWith("0001");
+}
+
+/**
+ * Retorna dados do estabelecimento (registro 0140) a usar como referência
+ * pro 0150/F010/F100 novos. Com matriz e filiais no mesmo SPED, existe um
+ * 0140 por estabelecimento — sempre usa o da matriz (CNPJ .../0001-XX),
+ * nunca o primeiro que aparecer no arquivo. Se nenhum bater (CNPJ fora do
+ * padrão, ou SPED sem matriz cadastrada), cai no primeiro como antes.
+ */
 export function info0140(lines: string[]): Info0140 | null {
+  let primeiro: Info0140 | null = null;
   for (const line of lines) {
     const f = campos(line);
     if (f.length > 1 && f[1] === "0140") {
-      return {
+      const info: Info0140 = {
         codEst: campo(f, 2),
         nome: campo(f, 3),
         cnpj: campo(f, 4),
         uf: campo(f, 5),
         codMun: campo(f, 7),
       };
+      if (ehMatriz(info.cnpj)) return info;
+      primeiro ??= info;
     }
   }
-  return null;
+  return primeiro;
 }

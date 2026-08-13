@@ -48,6 +48,11 @@ Os dois casos abaixo têm a mesma causa raiz: a inserção de um registro novo p
 >
 > Corrigido limpando o campo no foco (`onFocus`) — string vazia bate com as 8 opções, revelando a lista completa — e restaurando o valor anterior no blur (`onBlur`) caso o usuário clique pra fora sem digitar ou escolher nada, pra não exigir que quem nunca mexe nesse campo precise preenchê-lo de novo antes de gerar.
 
+> [!bug] Com matriz + filiais no mesmo SPED, o 0150/F100 novo saía associado à filial errada
+> Um SPED pode ter mais de um registro `0140` (um por estabelecimento — matriz e cada filial). `info0140()` sempre devolvia o **primeiro** `0140` do arquivo, na ordem em que aparece — não necessariamente a matriz. Esse CNPJ/nome/município alimentam o `0150` novo, e também decidem em qual seção do bloco F o `F100` novo entra (o código compara o CNPJ de cada `F010` encontrado contra esse valor pra saber se "entrou" na seção certa). Com uma filial na primeira posição do `0140`, tanto o `0150` quanto o `F100` podiam sair vinculados à filial em vez da matriz.
+>
+> Corrigido: `info0140()` agora varre todos os `0140` do arquivo e prefere o que tem CNPJ de matriz — os 12 dígitos antes do DV (raiz + ordem) terminando em `0001`, convenção da Receita pra identificar a matriz. Só cai no primeiro registro como fallback se nenhum bater (SPED sem matriz cadastrada, ou CNPJ fora do padrão). Validado com um SPED sintético com a filial listada antes da matriz tanto no `0140` quanto no `F010` do bloco F: `0150` sai com CNPJ/nome da matriz, e `F100` entra depois do `F010` da matriz. Reconfirmado que os arquivos de único estabelecimento usados nos testes anteriores continuam resolvendo pro mesmo CNPJ de sempre (sem regressão).
+
 ## Importação de recibos por competência (modo Múltiplos SPEDs)
 
 No modo de múltiplos SPEDs, cada arquivo precisa do recibo da escrituração anterior daquela competência — digitar um por um era repetitivo. O botão **"Importar recibos"** lê um arquivo de exportação (formato tab-separated: `ativo(true/false) · cnpj · dtIni(ISO) · dtFin(ISO) · dtTransmissao(ISO) · tipo · recibo-dígito`) e casa cada linha com o SPED anexado correspondente por **CNPJ + competência** (mês/ano de `DT_INI`), preenchendo o campo de recibo automaticamente.
