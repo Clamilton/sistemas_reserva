@@ -51,17 +51,6 @@ export function linhaF100(
 
 // M100 / M105 (PIS)
 
-/** M100 tipo 101 — placeholder zerado (regime regular sem crédito no período). */
-export function linhaM100_101(): string {
-  return `|M100|101|0|0|${fmtAliq(ALIQ_PIS)}|||0|0|0|0|0|0|0|0|\n`;
-}
-
-/** M105 do M100|101 — base total declarada, mas VL_BC_PIS=0 (nada alocado). */
-export function linhaM105_101(base: Decimal): string {
-  const b = fmtSped(base);
-  return `|M105|13|53|${b}|0|${b}|0|||RECUPERACAO DE CREDITOS TRIBUTARIOS|\n`;
-}
-
 /** M100 tipo 201 — crédito vinculado a receita não tributada. */
 export function linhaM100_201(base: Decimal, vlPis: Decimal): string {
   const b = fmtSped(base);
@@ -76,15 +65,6 @@ export function linhaM105_201(base: Decimal): string {
 }
 
 // M500 / M505 (COFINS)
-
-export function linhaM500_101(): string {
-  return `|M500|101|0|0|${fmtAliq(ALIQ_COFINS)}|||0|0|0|0|0|0|0|0|\n`;
-}
-
-export function linhaM505_101(base: Decimal): string {
-  const b = fmtSped(base);
-  return `|M505|13|53|${b}|0|${b}|0|||RECUPERACAO DE CREDITOS TRIBUTARIOS|\n`;
-}
 
 export function linhaM500_201(base: Decimal, vlCofins: Decimal): string {
   const b = fmtSped(base);
@@ -312,55 +292,43 @@ export function buildSped(params: BuildSpedParams): string[] {
   const inserirApos = new Map<number, string[]>();
   const inserirAntes = new Map<number, string[]>();
 
-  const Z = new Decimal(0);
-  // (regPai, cod, vlBaseM100, vlCredM100, vlBaseM105, somaVlBcM105)
-  // Regra 101: NÃO soma base nem crédito em M100/M500. Só detalha em
-  //            M105/M505 (TOT/NC recebem base; VL_BC fica 0).
-  // Regra 201: soma base e crédito em M100/M500. M105/M505 soma tudo.
-  const plano: [string, string, Decimal, Decimal, Decimal, boolean][] = [
-    ["M100", "101", Z, Z, base, false],
-    ["M100", "201", base, vlPis, base, true],
-    ["M500", "101", Z, Z, base, false],
-    ["M500", "201", base, vlCofins, base, true],
+  // (regPai, vlCred) — só o tipo 201 (crédito vinculado a receita não
+  // tributada). O tipo 101 (placeholder zerado, regime normal sem crédito)
+  // foi removido: ele sempre usa a alíquota padrão (1,65%/7,60%), a mesma
+  // de um M100|101/M500|101 real de quase qualquer empresa — criar um
+  // segundo registro com a mesma chave (COD_CRED+ALIQ) é rejeitado pelo
+  // PVA como "Duplicidade de ocorrência da chave", e anexar nosso M105 a
+  // esse registro real é rejeitado como "não deverá existir" (o crédito
+  // extemporâneo não tem documento em Bloco C/D que o sustente). Ver
+  // [[16 - SPED Retificador]] no repositório de docs.
+  const plano: [string, Decimal][] = [
+    ["M100", vlPis],
+    ["M500", vlCofins],
   ];
 
-  let inserirM100_101 = false;
   let inserirM100_201 = false;
-  let inserirM500_101 = false;
   let inserirM500_201 = false;
 
   const aliqEsperadaPorReg: Record<string, Decimal> = { M100: ALIQ_PIS, M500: ALIQ_COFINS };
 
-  for (const [regPai, cod, vlBM100, vlCM100, vlBM105, somaBc] of plano) {
+  for (const [regPai, vlCred] of plano) {
     const regFilho = regPai === "M100" ? "M105" : "M505";
-    const idxPaiCandidato = acharM100(lines, regPai, cod, aliqEsperadaPorReg[regPai]);
-    // Só reaproveita o M100/M500 achado se ele já tiver o filho M105/M505
-    // |13|53 que só ESTE gerador cria (marcador de "nosso" — outra rodada
-    // da ferramenta sobre um SPED que ela mesma já retificou antes). Um
-    // M100|101/M100|201 do próprio contribuinte, sem esse filho, é um
-    // crédito real e não tem nada a ver com o nosso lançamento — anexar
-    // um M105|13|53 novo a ele associa o crédito extemporâneo a um
-    // documento que não existe, e o PVA rejeita ("não deverá existir
-    // registro M105 ... não informados nos documentos e operações").
+    const idxPaiCandidato = acharM100(lines, regPai, "201", aliqEsperadaPorReg[regPai]);
+    // Só reaproveita o M100/M500|201 achado se ele já tiver o filho
+    // M105/M505|13|53 que só ESTE gerador cria (marcador de "nosso" —
+    // outra rodada da ferramenta sobre um SPED que ela mesma já retificou
+    // antes). Sem esse filho, trata como ausente e insere um par novo.
     const idxFilho = idxPaiCandidato !== null ? acharM105_13_53(lines, idxPaiCandidato, regFilho) : null;
 
     if (idxFilho === null) {
-      // Não é "nosso" → trata como ausente e insere um par M100+M105 (ou
-      // M500+M505) totalmente novo antes de M200/M600, nunca anexado a um
-      // M100/M500 alheio.
-      if (regPai === "M100" && cod === "101") inserirM100_101 = true;
-      else if (regPai === "M100" && cod === "201") inserirM100_201 = true;
-      else if (regPai === "M500" && cod === "101") inserirM500_101 = true;
-      else if (regPai === "M500" && cod === "201") inserirM500_201 = true;
+      if (regPai === "M100") inserirM100_201 = true;
+      else inserirM500_201 = true;
       continue;
     }
 
     const idxPai = idxPaiCandidato!;
-    if (vlBM100.gt(0) || vlCM100.gt(0)) {
-      substituir.set(idxPai, somarM100(lines[idxPai], vlBM100, vlCM100, nl));
-    }
-    const bcAdd = somaBc ? vlBM105 : new Decimal(0);
-    substituir.set(idxFilho, somarM105(lines[idxFilho], vlBM105, bcAdd, nl));
+    substituir.set(idxPai, somarM100(lines[idxPai], base, vlCred, nl));
+    substituir.set(idxFilho, somarM105(lines[idxFilho], base, base, nl));
   }
 
   // PER_APU_CRED = MMAAAA extraído da DT_OPER (DDMMAAAA) — sem barra.
@@ -480,10 +448,6 @@ export function buildSped(params: BuildSpedParams): string[] {
     // M115 antes de M200 faria o M100 novo entrar depois deles, fora de
     // ordem (mesma classe do bug de F100/F111-150 corrigido acima).
     if ((r === "M110" || r === "M200" || r === "M990") && !adicionouM100) {
-      if (inserirM100_101) {
-        out.push(normaliza(linhaM100_101(), nl));
-        out.push(normaliza(linhaM105_101(base), nl));
-      }
       if (inserirM100_201) {
         out.push(normaliza(linhaM100_201(base, vlPis), nl));
         out.push(normaliza(linhaM105_201(base), nl));
@@ -494,10 +458,6 @@ export function buildSped(params: BuildSpedParams): string[] {
     // ── M500/M505 antes de M510 (se existir) ou M600 (mesmo fallback em
     // M990) — mesmo motivo do M110 acima.
     if ((r === "M510" || r === "M600" || r === "M990") && !adicionouM500) {
-      if (inserirM500_101) {
-        out.push(normaliza(linhaM500_101(), nl));
-        out.push(normaliza(linhaM505_101(base), nl));
-      }
       if (inserirM500_201) {
         out.push(normaliza(linhaM500_201(base, vlCofins), nl));
         out.push(normaliza(linhaM505_201(base), nl));
