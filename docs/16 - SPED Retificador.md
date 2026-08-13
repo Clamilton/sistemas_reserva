@@ -43,6 +43,11 @@ Os dois casos abaixo têm a mesma causa raiz: a inserção de um registro novo p
 >
 > Corrigido expandindo o conjunto de saída pra cobrir todo registro que deve vir depois do F100 no leiaute oficial (F111 até F990). Na mesma revisão, identificado e corrigido preventivamente o mesmo padrão de bug nos blocos `M100`→`M110` e `M500`→`M510` (a inserção de um M100/M500 novo também só considerava M200/M600 como destino, ignorando M110/M510 como possíveis registros intermediários) — sem evidência de arquivo real que acionasse esse caso, mas a mesma causa raiz. Revalidado rodando `buildSped()` contra o SPED completo (35 mil linhas) que gerou o erro original.
 
+> [!bug] Dropdown de "Nome Conta Analítica" não mostrava nenhuma opção ao clicar
+> Campo de texto livre com um `<datalist>` de 8 descrições pré-cadastradas (`CONTAS_ANALITICAS`), pra sugerir sem travar a digitação livre. O campo vem pré-preenchido com um texto padrão ("LANCAMENTO DE CREDITO EXTEMPORANEO ACORDAO 9303009893") que não é nenhuma das 8 opções da lista — e o navegador filtra as sugestões do `<datalist>` pelo texto **já digitado** no campo, não mostra a lista inteira incondicionalmente. Com um valor que não bate com nenhuma opção, o resultado é sempre zero sugestões, então o dropdown nunca aparecia, mesmo com o `list`/`id` corretamente associados no HTML.
+>
+> Corrigido limpando o campo no foco (`onFocus`) — string vazia bate com as 8 opções, revelando a lista completa — e restaurando o valor anterior no blur (`onBlur`) caso o usuário clique pra fora sem digitar ou escolher nada, pra não exigir que quem nunca mexe nesse campo precise preenchê-lo de novo antes de gerar.
+
 ## Importação de recibos por competência (modo Múltiplos SPEDs)
 
 No modo de múltiplos SPEDs, cada arquivo precisa do recibo da escrituração anterior daquela competência — digitar um por um era repetitivo. O botão **"Importar recibos"** lê um arquivo de exportação (formato tab-separated: `ativo(true/false) · cnpj · dtIni(ISO) · dtFin(ISO) · dtTransmissao(ISO) · tipo · recibo-dígito`) e casa cada linha com o SPED anexado correspondente por **CNPJ + competência** (mês/ano de `DT_INI`), preenchendo o campo de recibo automaticamente.

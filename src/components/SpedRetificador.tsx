@@ -102,6 +102,7 @@ export function SpedRetificador() {
   const [credito, setCredito] = useState("");
   const [codCta, setCodCta] = useState("001");
   const [nomeCta, setNomeCta] = useState("LANCAMENTO DE CREDITO EXTEMPORANEO ACORDAO 9303009893");
+  const nomeCtaAntesDoFocoRef = useRef(nomeCta);
   const [codPart, setCodPart] = useState("001");
   const [descOper, setDescOper] = useState("");
   const [gerando, setGerando] = useState(false);
@@ -674,6 +675,13 @@ export function SpedRetificador() {
                 list="contas-analiticas"
                 value={nomeCta}
                 onChange={(e) => setNomeCta(e.target.value)}
+                onFocus={(e) => {
+                  nomeCtaAntesDoFocoRef.current = e.target.value;
+                  setNomeCta("");
+                }}
+                onBlur={(e) => {
+                  if (!e.target.value.trim()) setNomeCta(nomeCtaAntesDoFocoRef.current);
+                }}
                 className="input"
               />
               <datalist id="contas-analiticas">

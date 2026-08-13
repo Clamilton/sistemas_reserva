@@ -144,3 +144,9 @@ Maior obstáculo técnico foi o TypeScript: `lib: DOM` (usado pelo app) e `lib: 
 O worker mantém cache das leituras em memória (por nome de arquivo) pra não precisar transferir o array de linhas inteiro de volta e pra frente a cada geração — só o resumo cruza a fronteira na leitura, e os bytes finais (como `Uint8Array` transferível, sem cópia) na geração. `Decimal` não sobrevive ao `postMessage` (structured clone não sabe serializar), então o crédito atravessa como string. Detalhe técnico completo em [[16 - SPED Retificador]].
 
 Validado ao vivo no navegador contra os mesmos arquivos reais que expuseram os bugs de hierarquia: leitura e geração (single e múltiplos) completam em segundos com a aba respondendo normalmente durante o processamento — confirmado com uma captura de tela feita no meio da geração, sem atraso proposital, que não travou.
+
+## 26. SPED Retificador: dropdown de "Nome Conta Analítica" não mostrava opções
+
+Reportado: clicar no campo não mostrava nenhuma opção pra selecionar. Causa raiz encontrada por inspeção do código, não do DOM em si (dropdown nativo de `<datalist>` não é capturável por screenshot de automação de navegador) — o valor padrão pré-preenchido no campo ("LANCAMENTO DE CREDITO EXTEMPORANEO ACORDAO 9303009893") não é nenhuma das 8 opções cadastradas, e o navegador filtra as sugestões do `<datalist>` pelo texto já presente no campo. Sem nenhuma opção batendo com esse texto, o resultado é sempre zero sugestões — o dropdown "não fazia nada" porque não tinha o que mostrar, não por estar quebrado.
+
+Corrigido limpando o campo ao focar (revela as 8 opções) e restaurando o valor anterior ao perder o foco sem escolha, pra não afetar quem nunca mexe nesse campo. Detalhe técnico completo em [[16 - SPED Retificador]].
