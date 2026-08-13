@@ -212,6 +212,23 @@ export function acharM105_13_53(lines: string[], idxPai: number, regFilho: strin
   return null;
 }
 
+/** Retorna idx da última linha pertencente ao grupo do M100/M500 (último
+ * M105/M505 ou o próprio M100 se não houver filhos). */
+export function fimGrupoM100(lines: string[], idxPai: number, regFilho: string): number {
+  let ultima = idxPai;
+  for (let j = idxPai + 1; j < lines.length; j++) {
+    const rJ = reg(lines[j]);
+    if (rJ === regFilho) {
+      ultima = j;
+    } else if (rJ === "M100" || rJ === "M500") {
+      break;
+    } else if (rJ && !(rJ.startsWith("M1") || rJ.startsWith("M5"))) {
+      break;
+    }
+  }
+  return ultima;
+}
+
 /** Acha índice de |1100|...|201| ou |1500|...|201| (COD_CRED no campo 5). */
 export function achar1100_201(lines: string[], regPai: string): number | null {
   for (let i = 0; i < lines.length; i++) {
