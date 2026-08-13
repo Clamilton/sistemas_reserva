@@ -50,6 +50,7 @@ Lista do que é **sabidamente incompleto** hoje, organizada por nota relacionada
 
 ## SPED Retificador — [[16 - SPED Retificador]]
 - [ ] Validado byte a byte contra o Python original em cenários sintéticos e contra um SPED de produção real (que expôs e permitiu corrigir o bug do registro `0500`/`0900`) — mas a cobertura de casos reais ainda é pequena; vale ficar atento a outros arquivos que gerem erro no validador da Receita.
+- [ ] **Em aberto:** PVA rejeita o `M105`/`M505` que a ferramenta gera pro crédito extemporâneo ("Não deverá existir um registro M105 ... para Código da Natureza da Base de Cálculo do Crédito e Código de Situação Tributária não informados nos documentos e operações"). Confirmado que o erro ocorre tanto no par `101` (placeholder zerado) quanto no `201` (crédito real) — ou seja, não é só sobre anexar num M100 alheio (isso já foi corrigido), é sobre o próprio `NAT_BC_CRED=13`/`CST=53` não ter nenhum documento (Bloco C/D) que o sustente nessa competência, o que é sempre verdade pra um crédito vindo de decisão judicial/Acórdão, não de uma nota fiscal do mês. Precisa de orientação de quem opera a ferramenta: existe um código de natureza/CST correto pra esse tipo de crédito (sem exigir documento), ou o placeholder `101` deveria simplesmente deixar de ser gerado? Ver detalhe em [[16 - SPED Retificador]].
 
 ## Auditoria — [[15 - Auditoria]]
 - [ ] Não há paginação de verdade (só um limite de 500 registros por consulta) — se o log crescer muito, avaliar cursor/paginação.

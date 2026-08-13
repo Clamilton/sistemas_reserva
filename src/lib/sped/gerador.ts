@@ -13,7 +13,6 @@ import {
   campos,
   contaExiste,
   f010Existe,
-  fimGrupoM100,
   info0140,
   parseSped,
   participanteExiste,
@@ -334,12 +333,21 @@ export function buildSped(params: BuildSpedParams): string[] {
 
   for (const [regPai, cod, vlBM100, vlCM100, vlBM105, somaBc] of plano) {
     const regFilho = regPai === "M100" ? "M105" : "M505";
-    const idxPai = acharM100(lines, regPai, cod, aliqEsperadaPorReg[regPai]);
+    const idxPaiCandidato = acharM100(lines, regPai, cod, aliqEsperadaPorReg[regPai]);
+    // Só reaproveita o M100/M500 achado se ele já tiver o filho M105/M505
+    // |13|53 que só ESTE gerador cria (marcador de "nosso" — outra rodada
+    // da ferramenta sobre um SPED que ela mesma já retificou antes). Um
+    // M100|101/M100|201 do próprio contribuinte, sem esse filho, é um
+    // crédito real e não tem nada a ver com o nosso lançamento — anexar
+    // um M105|13|53 novo a ele associa o crédito extemporâneo a um
+    // documento que não existe, e o PVA rejeita ("não deverá existir
+    // registro M105 ... não informados nos documentos e operações").
+    const idxFilho = idxPaiCandidato !== null ? acharM105_13_53(lines, idxPaiCandidato, regFilho) : null;
 
-    if (idxPai === null) {
-      // Tipo ausente (101 ou 201) → insere bloco completo antes de
-      // M200/M600. Sem isso, se o bloco M estava vazio, só o 201 era
-      // inserido — o 101 (placeholder zerado) ficava de fora.
+    if (idxFilho === null) {
+      // Não é "nosso" → trata como ausente e insere um par M100+M105 (ou
+      // M500+M505) totalmente novo antes de M200/M600, nunca anexado a um
+      // M100/M500 alheio.
       if (regPai === "M100" && cod === "101") inserirM100_101 = true;
       else if (regPai === "M100" && cod === "201") inserirM100_201 = true;
       else if (regPai === "M500" && cod === "101") inserirM500_101 = true;
@@ -347,28 +355,12 @@ export function buildSped(params: BuildSpedParams): string[] {
       continue;
     }
 
+    const idxPai = idxPaiCandidato!;
     if (vlBM100.gt(0) || vlCM100.gt(0)) {
       substituir.set(idxPai, somarM100(lines[idxPai], vlBM100, vlCM100, nl));
     }
-
-    const idxFilho = acharM105_13_53(lines, idxPai, regFilho);
     const bcAdd = somaBc ? vlBM105 : new Decimal(0);
-    if (idxFilho !== null) {
-      substituir.set(idxFilho, somarM105(lines[idxFilho], vlBM105, bcAdd, nl));
-    } else {
-      const idxApos = fimGrupoM100(lines, idxPai, regFilho);
-      const nova =
-        regPai === "M100"
-          ? somaBc
-            ? linhaM105_201(vlBM105)
-            : linhaM105_101(vlBM105)
-          : somaBc
-            ? linhaM505_201(vlBM105)
-            : linhaM505_101(vlBM105);
-      const arr = inserirApos.get(idxApos) ?? [];
-      arr.push(normaliza(nova, nl));
-      inserirApos.set(idxApos, arr);
-    }
+    substituir.set(idxFilho, somarM105(lines[idxFilho], vlBM105, bcAdd, nl));
   }
 
   // PER_APU_CRED = MMAAAA extraído da DT_OPER (DDMMAAAA) — sem barra.

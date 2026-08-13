@@ -231,22 +231,6 @@ export function posInserirBlock1(lines: string[], targetCode: string): number | 
   return null;
 }
 
-/** Retorna idx da última linha pertencente ao grupo do M100/M500 (último
- * M105/M505 ou o próprio M100 se não houver filhos). */
-export function fimGrupoM100(lines: string[], idxPai: number, regFilho: string): number {
-  let ultima = idxPai;
-  for (let j = idxPai + 1; j < lines.length; j++) {
-    const rJ = reg(lines[j]);
-    if (rJ === regFilho) {
-      ultima = j;
-    } else if (rJ === "M100" || rJ === "M500") {
-      break;
-    } else if (rJ && !(rJ.startsWith("M1") || rJ.startsWith("M5"))) {
-      break;
-    }
-  }
-  return ultima;
-}
 
 export interface Info0140 {
   codEst: string;
