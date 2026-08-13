@@ -9,7 +9,7 @@ import { ALIQ_COFINS, ALIQ_PIS, fmtAliq, fmtSped, type CalculoResultado } from "
 import {
   acharM100,
   acharM105_13_53,
-  achar1100_201,
+  achar1100Periodo,
   campos,
   contaExiste,
   f010Existe,
@@ -62,11 +62,14 @@ export function linhaM100(codCred: string, base: Decimal, vlPis: Decimal): strin
 }
 
 /** M105 — detalhamento com natureza 13 (outras operações com direito a
- * crédito) e CST 53, todo o valor da base alocado. Mesmo conteúdo
- * independente do código do M100 pai (o COD_CRED não aparece no M105). */
-export function linhaM105(base: Decimal): string {
+ * crédito) e CST 53. `base` vai em TOT/NC (valor declarado); `bcAlocado`
+ * vai em VL_BC_PIS — 0 quando o M100 pai é código 101 (só declara a
+ * base, não aloca crédito nesse bucket), igual a `base` quando é 201
+ * (aloca o crédito inteiro). */
+export function linhaM105(base: Decimal, bcAlocado: Decimal): string {
   const b = fmtSped(base);
-  return `|M105|13|53|${b}|0|${b}|${b}|||RECUPERACAO DE CREDITOS TRIBUTARIOS|\n`;
+  const bc = fmtSped(bcAlocado);
+  return `|M105|13|53|${b}|0|${b}|${bc}|||RECUPERACAO DE CREDITOS TRIBUTARIOS|\n`;
 }
 
 // M500 / M505 (COFINS)
@@ -77,25 +80,26 @@ export function linhaM500(codCred: string, base: Decimal, vlCofins: Decimal): st
   return `|M500|${codCred}|0|${b}|${fmtAliq(ALIQ_COFINS)}|||${vc}|0|0|0|${vc}|1|0|${vc}|\n`;
 }
 
-export function linhaM505(base: Decimal): string {
+export function linhaM505(base: Decimal, bcAlocado: Decimal): string {
   const b = fmtSped(base);
-  return `|M505|13|53|${b}|0|${b}|${b}|||RECUPERACAO DE CREDITOS TRIBUTARIOS|\n`;
+  const bc = fmtSped(bcAlocado);
+  return `|M505|13|53|${b}|0|${b}|${bc}|||RECUPERACAO DE CREDITOS TRIBUTARIOS|\n`;
 }
 
 // 1100 / 1500 (Controle de Créditos Fiscais)
 
-/** 1100 PIS - Controle de Créditos Fiscais (cod 201). 18 campos.
- * ORIG_CRED='01' (crédito apurado no próprio período). PER_APU_CRED é
- * MMAAAA, sem barra — o validador da Receita rejeita "MM/AAAA". */
-export function linha1100_201(per: string, vlCred: Decimal): string {
+/** 1100 PIS - Controle de Créditos Fiscais. 18 campos. ORIG_CRED='01'
+ * (crédito apurado no próprio período). PER_APU_CRED é MMAAAA, sem
+ * barra — o validador da Receita rejeita "MM/AAAA". */
+export function linha1100(codCred: string, per: string, vlCred: Decimal): string {
   const v = fmtSped(vlCred);
-  return `|1100|${per}|01||201|${v}|0|${v}|0|0|0|${v}|0|0|0|0|0|${v}|\n`;
+  return `|1100|${per}|01||${codCred}|${v}|0|${v}|0|0|0|${v}|0|0|0|0|0|${v}|\n`;
 }
 
-/** 1500 COFINS - Controle de Créditos Fiscais (cod 201). 18 campos. */
-export function linha1500_201(per: string, vlCred: Decimal): string {
+/** 1500 COFINS - Controle de Créditos Fiscais. 18 campos. */
+export function linha1500(codCred: string, per: string, vlCred: Decimal): string {
   const v = fmtSped(vlCred);
-  return `|1500|${per}|01||201|${v}|0|${v}|0|0|0|${v}|0|0|0|0|0|${v}|\n`;
+  return `|1500|${per}|01||${codCred}|${v}|0|${v}|0|0|0|${v}|0|0|0|0|0|${v}|\n`;
 }
 
 // ─── Montagem do novo SPED ──────────────────────────────────────────────────
@@ -297,18 +301,24 @@ export function buildSped(params: BuildSpedParams): string[] {
   const inserirApos = new Map<number, string[]>();
   const inserirAntes = new Map<number, string[]>();
 
-  // O crédito extemporâneo entra no MESMO grupo (COD_CRED) que o crédito
-  // "normal" do contribuinte já usa — como mais um detalhamento M105/M505
-  // de natureza 13 (outras operações com direito a crédito) e CST 53.
-  // Confirmado direto no validador da Receita, em duas empresas
-  // diferentes: quando já existe um M100|101 real (crédito vinculado a
-  // receita tributada — o caso mais comum), o novo M105/M505 tem que
-  // entrar nesse MESMO grupo, com base e crédito somados também no
-  // próprio M100/M500 pai (não só no filho). Só cria um par novo se não
-  // existir NENHUM M100/M500 (nem 101 nem 201) com a alíquota padrão —
-  // nesse caso usa 201 (crédito vinculado a receita não tributada), pra
-  // ficar consistente com o Bloco 1 (1100/1500 logo abaixo), que sempre
-  // usa 201. Ver [[16 - SPED Retificador]] no repositório de docs.
+  // PER_APU_CRED = MMAAAA extraído da DT_OPER (DDMMAAAA) — sem barra.
+  const perApu = dtOper.length === 8 ? dtOper.slice(2, 4) + dtOper.slice(4) : "";
+
+  // O crédito extemporâneo sempre é reivindicado de fato no código 201
+  // (crédito vinculado a receita não tributada) — M100/M500, M105/M505 e
+  // 1100/1500 nesse código carregam os valores reais (base e crédito).
+  // Se já existir um M100/M500|101 real (aliquota padrão — o crédito
+  // "normal" do contribuinte, presente em quase todo SPED com Bloco M
+  // preenchido), ele TAMBÉM ganha um detalhamento M105/M505 de natureza
+  // 13/CST 53 — mas só a base (TOT/NC), nunca crédito: o 101 nunca soma
+  // no próprio M100/M500 nem aloca VL_BC_PIS/COFINS. As duas coisas são
+  // independentes uma da outra (confirmado testando com SPEDs reais: o
+  // 201 sempre precisa existir, e some pra pouco com um 101 que já tenha
+  // sido só atualizado). Ver [[16 - SPED Retificador]] no repositório
+  // de docs.
+  const aliqEsperadaPorReg: Record<string, Decimal> = { M100: ALIQ_PIS, M500: ALIQ_COFINS };
+  const Z = new Decimal(0);
+
   const plano: [string, Decimal][] = [
     ["M100", vlPis],
     ["M500", vlCofins],
@@ -317,14 +327,27 @@ export function buildSped(params: BuildSpedParams): string[] {
   let inserirM100 = false;
   let inserirM500 = false;
 
-  const aliqEsperadaPorReg: Record<string, Decimal> = { M100: ALIQ_PIS, M500: ALIQ_COFINS };
-
   for (const [regPai, vlCred] of plano) {
     const regFilho = regPai === "M100" ? "M105" : "M505";
-    const idxPai =
-      acharM100(lines, regPai, "101", aliqEsperadaPorReg[regPai]) ??
-      acharM100(lines, regPai, "201", aliqEsperadaPorReg[regPai]);
+    const aliq = aliqEsperadaPorReg[regPai];
 
+    // ── 101 real (se existir): só declara a base, nunca soma crédito. ──
+    const idx101 = acharM100(lines, regPai, "101", aliq);
+    if (idx101 !== null) {
+      const idxFilho101 = acharM105_13_53(lines, idx101, regFilho);
+      if (idxFilho101 !== null) {
+        substituir.set(idxFilho101, somarM105(lines[idxFilho101], base, Z, nl));
+      } else {
+        const idxApos = fimGrupoM100(lines, idx101, regFilho);
+        const nova = regPai === "M100" ? linhaM105(base, Z) : linhaM505(base, Z);
+        const arr = inserirApos.get(idxApos) ?? [];
+        arr.push(normaliza(nova, nl));
+        inserirApos.set(idxApos, arr);
+      }
+    }
+
+    // ── 201: sempre reivindica o crédito de verdade (pai + filho). ──
+    const idxPai = acharM100(lines, regPai, "201", aliq);
     if (idxPai === null) {
       if (regPai === "M100") inserirM100 = true;
       else inserirM500 = true;
@@ -338,22 +361,24 @@ export function buildSped(params: BuildSpedParams): string[] {
       substituir.set(idxFilho, somarM105(lines[idxFilho], base, base, nl));
     } else {
       const idxApos = fimGrupoM100(lines, idxPai, regFilho);
-      const nova = regPai === "M100" ? linhaM105(base) : linhaM505(base);
+      const nova = regPai === "M100" ? linhaM105(base, base) : linhaM505(base, base);
       const arr = inserirApos.get(idxApos) ?? [];
       arr.push(normaliza(nova, nl));
       inserirApos.set(idxApos, arr);
     }
   }
 
-  // PER_APU_CRED = MMAAAA extraído da DT_OPER (DDMMAAAA) — sem barra.
-  const perApu = dtOper.length === 8 ? dtOper.slice(2, 4) + dtOper.slice(4) : "";
-
   const blocosControle: [string, Decimal, (per: string, v: Decimal) => string][] = [
-    ["1100", vlPis, linha1100_201],
-    ["1500", vlCofins, linha1500_201],
+    ["1100", vlPis, (per, v) => linha1100("201", per, v)],
+    ["1500", vlCofins, (per, v) => linha1500("201", per, v)],
   ];
   for (const [regPai, vlCred, fnNova] of blocosControle) {
-    const idx = achar1100_201(lines, regPai);
+    // Filtra por período (perApu) — 1100/1500 é uma linha por mês de
+    // origem do crédito; sem isso, um SPED com 1100/1500 de um período
+    // ANTERIOR (ex.: retificação de um mês depois de já ter havido
+    // controle de crédito no mês passado) tinha o crédito deste mês
+    // somado ali, atribuído ao período errado.
+    const idx = achar1100Periodo(lines, regPai, "201", perApu);
     if (idx !== null) {
       substituir.set(idx, somar1100(lines[idx], vlCred, nl));
     } else {
@@ -464,7 +489,7 @@ export function buildSped(params: BuildSpedParams): string[] {
     if ((r === "M110" || r === "M200" || r === "M990") && !adicionouM100) {
       if (inserirM100) {
         out.push(normaliza(linhaM100("201", base, vlPis), nl));
-        out.push(normaliza(linhaM105(base), nl));
+        out.push(normaliza(linhaM105(base, base), nl));
       }
       adicionouM100 = true;
     }
@@ -474,7 +499,7 @@ export function buildSped(params: BuildSpedParams): string[] {
     if ((r === "M510" || r === "M600" || r === "M990") && !adicionouM500) {
       if (inserirM500) {
         out.push(normaliza(linhaM500("201", base, vlCofins), nl));
-        out.push(normaliza(linhaM505(base), nl));
+        out.push(normaliza(linhaM505(base, base), nl));
       }
       adicionouM500 = true;
     }

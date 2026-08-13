@@ -229,11 +229,13 @@ export function fimGrupoM100(lines: string[], idxPai: number, regFilho: string):
   return ultima;
 }
 
-/** Acha índice de |1100|...|201| ou |1500|...|201| (COD_CRED no campo 5). */
-export function achar1100_201(lines: string[], regPai: string): number | null {
+/** Acha índice de |1100|...|codCred| ou |1500|...|codCred| do MESMO período
+ * (campo 2, PER_APU_CRED) — 1100/1500 é uma linha por período de origem do
+ * crédito; somar num período diferente atribuiria o crédito ao mês errado. */
+export function achar1100Periodo(lines: string[], regPai: string, codCred: string, perApu: string): number | null {
   for (let i = 0; i < lines.length; i++) {
     const f = campos(lines[i]);
-    if (f.length > 5 && f[1] === regPai && f[5] === "201") return i;
+    if (f.length > 5 && f[1] === regPai && f[2] === perApu && f[5] === codCred) return i;
   }
   return null;
 }
