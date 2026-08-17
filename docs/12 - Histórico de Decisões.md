@@ -219,3 +219,35 @@ Corrigido o desenho pra valer: as duas coisas são **independentes**, não uma e
 - `1100`/`1500` sempre usa `201` (nunca `101`) e agora filtra por **período** também (`achar1100Periodo()`) — o arquivo dessa mesma empresa tinha um `1100|101` de um mês anterior que, sem esse filtro, teria absorvido o crédito do mês sendo retificado, atribuindo-o ao período errado.
 
 Validado localmente contra os dois SPEDs reais com `101` legítimo: o `101` fica intocado (só ganha o `M105` informativo com crédito zero), o `201` novo carrega o crédito completo, e o `1100`/`1500` de período anterior não é contaminado. Detalhe técnico completo (as cinco tentativas em sequência, três empresas) em [[16 - SPED Retificador]]. **Ainda sem confirmação de 0 erros no PVA com esta versão** — depende do próximo teste do usuário.
+
+## 35. SPED Retificador: o código 101 tinha sumido do arquivo gerado
+
+Usuário reportou que o módulo estava "totalmente quebrado", associando o problema à regra de matriz/filial (item 29). Investigando o gerador contra o `sped_retificador.py` de referência, o sintoma concreto era outro e mais específico: **o `M100|101`/`M500|101` não estava sendo gerado**.
+
+Causa: regressão do item 31. Lá, o placeholder `101` foi removido porque o PVA rejeitou com "Duplicidade de ocorrência da chave" — diagnóstico correto —, mas a remoção foi **total**. Sobrou só o caminho "se já existe um `101` no arquivo, anexa o `M105`/`M505` nele", e todo SPED **sem** nenhum `M100|101` passou a sair sem o código 101, sem nenhum aviso. Agravante que ninguém tinha notado: `acharM100()` filtra por alíquota, então um `101` real com alíquota fora da padrão (empresa no cumulativo: 0,65%/3%) não era encontrado — e era justamente aí que a versão antiga *inseria* um segundo `101`, produzindo a duplicidade que se queria evitar.
+
+Corrigido restaurando o placeholder com a guarda que faltava desde o começo: a busca cai pra `acharM100(..., '101', null)` quando não acha com a alíquota padrão, ou seja, **qualquer** `M100|101` existente inibe a inserção e recebe só o `M105`/`M505` declaratório. O par zerado só é emitido quando não há `101` nenhum no arquivo. O 101 sempre sai, a chave nunca duplica — as duas exigências que antes pareciam mutuamente exclusivas.
+
+Validado rodando `buildSped()` contra 11 SPEDs sintéticos (7 de matriz/filial, 4 de bloco M, incluindo `101` com alíquota fora da padrão e bloco M inteiramente vazio). O cenário já aprovado no PVA sai byte a byte igual ao de antes. **Confirmado pelo usuário no validador da Receita** — primeira versão com validação de ponta a ponta depois de seis rodadas em três empresas. Ver [[16 - SPED Retificador]].
+
+## 36. SPED Retificador: o F100 novo roubava o F111 do contribuinte
+
+Encontrado na mesma investigação do item 35, sem ter sido reportado — apareceu ao rodar o gerador contra um SPED sintético com `F111`.
+
+Causa: over-correction do item 23. Aquele fix expandiu o conjunto de "saída do grupo F010" pra cobrir "todo registro que vem depois do F100 no leiaute" — e isso incluiu registros-**filho** (`F111`, `F129`, `F139`, `F205`, `F210`, `F211`, `F509`, `F519`, `F559`, `F569`). Mas no SPED o vínculo pai-filho é **posicional**: um `F111` pertence ao `F100` imediatamente anterior. Num arquivo `F010 > F100 > F111`, o `F100` novo entrava entre os dois — o processo referenciado do contribuinte passava a pertencer ao nosso `F100` de recuperação de crédito, e o `F100` original ficava sem ele.
+
+Isso é pior que ordem trocada: é corrupção silenciosa de dado do contribuinte. Na prática só o `F111` chegava a ser exercitado (é o único filho que aparece antes de qualquer irmão de `F100`), mas os demais estavam errados pela mesma regra.
+
+Corrigido reduzindo `F_SAIR_GRUPO` só aos irmãos de `F100` mais os delimitadores (`F010`, `F120`, `F130`, `F150`, `F200`, `F500`, `F510`, `F525`, `F550`, `F560`, `F600`, `F700`, `F800`, `F990`). A parte legítima do item 23 — `F120`/`F130`/`F150`, que de fato precisam vir depois do `F100` — continua valendo, e o cenário do `F120` que originou aquele fix segue passando.
+
+Vale registrar o padrão: o item 23 corrigiu um bug real e introduziu outro no mesmo commit, porque a regra usada ("tudo que vem depois") era mais grosseira que a regra verdadeira ("os irmãos que vêm depois"). Hierarquia não é a mesma coisa que ordem.
+
+## 37. SPED Retificador: o aviso de múltiplos 0140 contradizia a regra da matriz
+
+Terceiro achado da mesma investigação. Desde o item 29 o `info0140()` prefere a matriz, mas a mensagem da tela continuou com o texto herdado do Python: *"Sempre é usado o CNPJ do PRIMEIRO — confira se é o correto"*, exibida em vermelho.
+
+Ou seja: exatamente no cenário que a regra da matriz existe pra resolver, o usuário era mandado conferir o estabelecimento errado, e um arquivo processado **corretamente** aparecia como erro no log. Não quebrava o arquivo gerado — mas é provável que tenha contribuído pra percepção de que o módulo estava "totalmente quebrado", já que o aviso vermelho aparece justamente nos SPEDs de matriz+filial.
+
+Corrigido: com matriz entre os `0140`, o log informa qual foi usada (nome + CNPJ) como mensagem normal; o vermelho fica só pro caso que de fato pede atenção — nenhum `0140` com CNPJ de matriz, caindo no fallback do primeiro. `ehMatriz()` passou a ser exportado do `parser.ts` pra UI usar a mesma regra do gerador, em vez de reimplementar o teste.
+
+Quando uma regra de negócio muda, o texto que a explica pro usuário é parte da mudança — um aviso desatualizado mente com a mesma autoridade de um correto.
